@@ -1,0 +1,27 @@
+'use client'
+
+import { type HTMLAttributes } from 'react'
+import { cn } from '@/lib/utils'
+
+interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error'
+}
+
+export function Badge({ className, variant = 'primary', ...props }: BadgeProps) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors',
+        {
+          'bg-primary/10 text-primary': variant === 'primary',
+          'bg-secondary/10 text-secondary-foreground': variant === 'secondary',
+          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': variant === 'success',
+          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': variant === 'warning',
+          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': variant === 'error',
+        },
+        className
+      )}
+      {...props}
+    />
+  )
+}

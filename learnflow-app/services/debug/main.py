@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import os
 import sys
+import time
 import traceback
 import json
 
@@ -251,53 +252,79 @@ class DebugEngine:
                     return error_type
         return ErrorType.UNKNOWN
     
-    def execute_code(self, code: str, test_input: str = None) -> Dict[str, Any]:
-        """Execute code in isolated environment and capture output/errors"""
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write(code)
-            temp_file = f.name
-        
+    def _apply_resource_limits(self):
         try:
-            # Prepare input
+            import resource
+            resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
+            resource.setrlimit(resource.RLIMIT_AS, (50 * 1024 * 1024, 50 * 1024 * 1024))
+            resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024, 1024 * 1024))
+            resource.setrlimit(resource.RLIMIT_NPROC, (10, 10))
+        except (ImportError, resource.error):
+            pass
+
+    def _restrict_builtins(self, code: str) -> str:
+        dangerous = ["__import__", "exec", "eval", "compile", "open", "breakpoint", "__subclasses__"]
+        restricted_imports = ["os", "sys", "subprocess", "shutil", "socket", "requests", "http", "ctypes", "signal", "multiprocessing", "threading"]
+        wrapper = (
+            "import sys, builtins\n"
+            "_safe_builtins = {k: v for k, v in builtins.__dict__.items() if k not in %s}\n"
+            "_safe_builtins['__import__'] = lambda name, *args, **kw: "
+            "    (_ for _ in ()).throw(ImportError('%%s is not allowed' %% name)) "
+            "if name in %s else builtins.__import__(name, *args, **kw)\n"
+            "sys.modules.update({m: type(sys)('restricted') for m in %s})\n"
+            "builtins.__dict__.update(_safe_builtins)\n"
+            "del sys, builtins, _safe_builtins\n\n"
+        ) % (repr(dangerous), repr(restricted_imports), repr(restricted_imports))
+        return wrapper + code
+
+    def execute_code(self, code: str, test_input: str = None) -> Dict[str, Any]:
+        """Execute code in isolated sandboxed environment with resource limits"""
+        restricted_code = self._restrict_builtins(code)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(restricted_code)
+            temp_file = f.name
+
+        start_time = time.time()
+        try:
             input_data = test_input.encode() if test_input else None
-            
-            # Run with timeout and limited resources
             result = subprocess.run(
-                [sys.executable, temp_file],
+                [sys.executable, '-I', temp_file],
                 input=input_data,
                 capture_output=True,
                 text=True,
                 timeout=10,
-                # Resource limits (Linux only)
-                # preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
+                preexec_fn=self._apply_resource_limits,
+                env={},
             )
-            
+            exec_time = (time.time() - start_time) * 1000
+
             return {
                 "success": result.returncode == 0,
                 "stdout": result.stdout,
                 "stderr": result.stderr,
-                "returncode": result.returncode
+                "returncode": result.returncode,
+                "execution_time_ms": round(exec_time, 2),
             }
         except subprocess.TimeoutExpired:
             return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Execution timed out (10s limit)",
-                "returncode": -1,
-                "error_type": ErrorType.TIMEOUT
+                "success": False, "stdout": "", "stderr": "Execution timed out (5s limit)",
+                "returncode": -1, "error_type": ErrorType.TIMEOUT, "execution_time_ms": 5000,
+            }
+        except MemoryError:
+            return {
+                "success": False, "stdout": "", "stderr": "Memory limit exceeded (50MB max)",
+                "returncode": -1, "error_type": ErrorType.MEMORY_ERROR, "execution_time_ms": 0,
             }
         except Exception as e:
             return {
-                "success": False,
-                "stdout": "",
-                "stderr": str(e),
-                "returncode": -1
+                "success": False, "stdout": "", "stderr": str(e),
+                "returncode": -1, "execution_time_ms": 0,
             }
         finally:
             try:
                 os.unlink(temp_file)
-            except:
+            except Exception:
                 pass
     
     def analyze_error(self, code: str, error_message: str = None, test_input: str = None) -> Dict[str, Any]:
