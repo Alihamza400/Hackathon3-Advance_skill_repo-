@@ -8,6 +8,7 @@ from enum import Enum
 import os
 import uuid
 import ast
+import math
 import re
 
 from shared.base import (
@@ -307,7 +308,7 @@ class CodeReviewEngine:
             "summary": summary,
             "issues": issues,
             "suggestions": suggestions,
-            "passes": summary["overall_score"] >= 70.0
+            "passes": summary.overall_score >= 70.0
         }
     
     def _analyze_ast(self, code: str) -> List[Dict]:

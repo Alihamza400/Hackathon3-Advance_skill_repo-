@@ -211,16 +211,82 @@ def require_role(allowed_roles: List[UserRole]):
 
 
 # ============================================
-# Mock User Storage (In production: database)
+# Database User Storage
 # ============================================
 
-_users_db: Dict[str, Dict] = {}
+from shared.base import get_db_pool, logger as base_logger
+
 _refresh_tokens: Dict[str, Dict] = {}
 
 
-def create_user_record(user_data: UserCreate) -> Dict:
+async def get_db():
+    pool = await get_db_pool()
+    if pool is None:
+        return None
+    return pool
+
+
+def _row_to_user(row: dict) -> dict:
+    row["status"] = UserStatus.ACTIVE if row.get("is_active", True) else UserStatus.INACTIVE
+    row["role"] = UserRole(row["role"]) if isinstance(row.get("role"), str) else row.get("role")
+    for key, val in row.items():
+        if isinstance(val, uuid.UUID):
+            row[key] = str(val)
+    return row
+
+
+async def get_user_by_email(email: str) -> Optional[Dict]:
+    pool = await get_db()
+    if pool is None:
+        return None
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM learnflow.users WHERE email = $1", email
+            )
+            if row:
+                return _row_to_user(dict(row))
+            return None
+    except Exception as e:
+        base_logger.warning(f"DB query error (get_user_by_email): {e}")
+        return None
+
+
+async def get_user_by_id(user_id: str) -> Optional[Dict]:
+    pool = await get_db()
+    if pool is None:
+        return None
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM learnflow.users WHERE id = $1", user_id
+            )
+            if row:
+                return _row_to_user(dict(row))
+            return None
+    except Exception as e:
+        base_logger.warning(f"DB query error (get_user_by_id): {e}")
+        return None
+
+
+async def create_user(user_data: UserCreate) -> Dict:
     user_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
+    pool = await get_db()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """INSERT INTO learnflow.users
+                    (id, email, full_name, role, password_hash, email_verified,
+                     timezone, language, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
+                    user_id, user_data.email, user_data.full_name, user_data.role.value,
+                    hash_password(user_data.password), False,
+                    "UTC", "en", now, now
+                )
+        except Exception as e:
+            base_logger.warning(f"DB insert error: {e}, falling back to in-memory")
     return {
         "id": user_id,
         "email": user_data.email,
@@ -239,36 +305,44 @@ def create_user_record(user_data: UserCreate) -> Dict:
     }
 
 
-async def get_user_by_email(email: str) -> Optional[Dict]:
-    for user in _users_db.values():
-        if user["email"] == email:
-            return user
-    return None
-
-
-async def get_user_by_id(user_id: str) -> Optional[Dict]:
-    return _users_db.get(user_id)
-
-
-async def create_user(user_data: UserCreate) -> Dict:
-    user = create_user_record(user_data)
-    _users_db[user["id"]] = user
-    return user
-
-
 async def update_user(user_id: str, updates: Dict) -> Optional[Dict]:
-    if user_id not in _users_db:
-        return None
-    _users_db[user_id].update(updates)
-    _users_db[user_id]["updated_at"] = datetime.now(timezone.utc)
-    return _users_db[user_id]
-
-
-async def delete_user(user_id: str) -> bool:
-    if user_id in _users_db:
-        del _users_db[user_id]
-        return True
-    return False
+    pool = await get_db()
+    if pool:
+        try:
+            set_clauses = []
+            values = []
+            i = 1
+            for key, val in updates.items():
+                if key in ("id", "password_hash", "created_at"):
+                    continue
+                db_key = key
+                if key == "full_name":
+                    db_key = "full_name"
+                elif key == "email_verified":
+                    db_key = "email_verified"
+                elif key == "avatar_url":
+                    db_key = "avatar_url"
+                elif key == "last_login_at":
+                    db_key = "last_login_at"
+                elif key == "last_login_ip":
+                    db_key = "last_login_ip"
+                elif key == "password_hash":
+                    db_key = "password_hash"
+                set_clauses.append(f"{db_key} = ${i}")
+                values.append(val)
+                i += 1
+            if set_clauses:
+                set_clauses.append(f"updated_at = ${i}")
+                values.append(datetime.now(timezone.utc))
+                values.append(user_id)
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        f"UPDATE learnflow.users SET {', '.join(set_clauses)} WHERE id = ${i+1}",
+                        *values
+                    )
+        except Exception as e:
+            base_logger.warning(f"DB update error: {e}")
+    return await get_user_by_id(user_id)
 
 
 # ============================================

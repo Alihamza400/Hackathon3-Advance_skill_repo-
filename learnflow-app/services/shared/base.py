@@ -35,13 +35,13 @@ class Settings(BaseSettings):
     postgres_port: int = int(os.getenv("POSTGRES_PORT", "5432"))
     postgres_db: str = os.getenv("POSTGRES_DB", "learnflow")
     postgres_user: str = os.getenv("POSTGRES_USER", "learnflow")
-    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "")
+    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "learnflow")
     
     # Redis
     redis_host: str = os.getenv("REDIS_HOST", "localhost")
     redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
     redis_password: str = os.getenv("REDIS_PASSWORD", "")
-    redis_ssl: bool = os.getenv("REDIS_SSL", "true").lower() == "true"
+    redis_ssl: bool = os.getenv("REDIS_SSL", "false").lower() == "true"
     
     # Kafka
     kafka_brokers: str = os.getenv("KAFKA_BROKERS", "localhost:9092")

@@ -13,6 +13,7 @@ import sys
 import time
 import traceback
 import json
+import re
 
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
