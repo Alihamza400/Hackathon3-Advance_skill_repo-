@@ -1,0 +1,165 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: learnflow-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: learnflow-app
+    app.kubernetes.io/part-of: learnflow
+    app.kubernetes.io/managed-by: argocd
+spec:
+  project: learnflow
+  destination:
+    namespace: learnflow
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/learnflow/learnflow-app
+    targetRevision: HEAD
+    path: learnflow-app/k8s/overlays/production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/name: learnflow
+        app.kubernetes.io/part-of: learnflow
+        argocd.argoproj.io/managed-by: argocd
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/metrics
+---
+# Sync waves for proper ordering
+# Wave 0: Namespaces and Secrets
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: learnflow
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/part-of: learnflow
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kong
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/part-of: learnflow
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dapr-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/part-of: learnflow
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/part-of: learnflow
+---
+# Wave 1: Infrastructure services (Postgres, Redis, Kafka, Dapr)
+---
+# Wave 2: Kong API Gateway
+---
+# Wave 3: Microservices (auth, triage, concepts, code-review, debug, exercise, progress)
+---
+# Wave 4: Frontend application
+---
+# Health checks for resource types
+metadata:
+  annotations:
+    argocd.argoproj.io/health-check: |
+      {
+        "apps/v1/Deployment": {
+          "health": {
+            "operator": "and",
+            "checks": [
+              {
+                "operator": "gte",
+                "field": "status.readyReplicas",
+                "value": "status.replicas"
+              },
+              {
+                "operator": "eq",
+                "field": "status.updatedReplicas",
+                "value": "status.replicas"
+              }
+            ]
+          }
+        },
+        "apps/v1/StatefulSet": {
+          "health": {
+            "operator": "and",
+            "checks": [
+              {
+                "operator": "gte",
+                "field": "status.readyReplicas",
+                "value": "status.replicas"
+              },
+              {
+                "operator": "eq",
+                "field": "status.updatedReplicas",
+                "value": "status.replicas"
+              }
+            ]
+          }
+        },
+        "batch/v1/Job": {
+          "health": {
+            "operator": "and",
+            "checks": [
+              {
+                "operator": "eq",
+                "field": "status.succeeded",
+                "value": "status.completions"
+              }
+            ]
+          }
+        },
+        "v1/Service": {
+          "health": {
+            "operator": "or",
+            "checks": [
+              {
+                "operator": "eq",
+                "field": "status.loadBalancer.ingress[0].hostname"
+              },
+              {
+                "operator": "eq",
+                "field": "spec.clusterIP"
+              }
+            ]
+          }
+        }
+      }

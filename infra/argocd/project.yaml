@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: learnflow
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: learnflow-project
+    app.kubernetes.io/part-of: learnflow
+spec:
+  description: LearnFlow multi-agent AI learning platform
+  sourceRepos:
+    - https://github.com/learnflow/*
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: ""
+      kind: PersistentVolume
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: Endpoints
+    - group: ""
+      kind: LimitRange
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: ReplicationController
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: DaemonSet
+    - group: apps
+      kind: ReplicaSet
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: batch
+      kind: Job
+    - group: batch
+      kind: CronJob
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: dapr.io
+      kind: Component
+    - group: dapr.io
+      kind: Configuration
+  orphanedResources:
+    warn: true
+  roles:
+    - name: admin
+      description: LearnFlow project admin
+      policies:
+        - p, proj:learnflow:admin, applications, *, learnflow/*, allow
+      groups:
+        - learnflow-admins
+    - name: developer
+      description: LearnFlow developer with sync privileges
+      policies:
+        - p, proj:learnflow:developer, applications, sync, learnflow/*, allow
+        - p, proj:learnflow:developer, applications, get, learnflow/*, allow
+      groups:
+        - learnflow-developers
+  syncWindows:
+    - kind: allow
+      schedule: "* * * * *"
+      duration: 1h
+      applications:
+        - learnflow-*
+      clusters:
+        - https://kubernetes.default.svc
+      namespaces:
+        - learnflow
+      manualSync: true

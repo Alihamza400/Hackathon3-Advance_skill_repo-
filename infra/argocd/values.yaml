@@ -1,0 +1,238 @@
+# ArgoCD Helm values for LearnFlow production deployment
+
+global:
+  image:
+    repository: argoproj/argocd
+    tag: "v2.9.6"
+    imagePullPolicy: IfNotPresent
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    fsGroup: 999
+
+controller:
+  name: application-controller
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    rules:
+      enabled: true
+      selector:
+        prometheus: kube-prometheus
+  clusterAdminAccess:
+    enabled: true
+  sharding:
+    enabled: true
+    clustersPerShard: 50
+  env:
+    - name: ARGOCD_CONTROLLER_REPLICAS
+      value: "2"
+    - name: ARGOCD_IN_CLUSTER_NAMESPACE
+      value: argocd
+
+server:
+  name: server
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    servicePort: 443
+    containerPort: 8080
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    hosts:
+      - argocd.learnflow.app
+    tls:
+      - hosts:
+          - argocd.learnflow.app
+        secretName: argocd-tls
+  config:
+    url: https://argocd.learnflow.app
+    statusBadgeEnabled: true
+    kustomize.buildOptions: "--enable-helm"
+    repositories: |
+      - url: https://github.com/learnflow/learnflow-app
+    resource.customizations: |
+      admissionregistration.k8s.io/MutatingWebhookConfiguration:
+        ignoreDifferences: |
+          jsonPointers:
+          - /webhooks/0/clientConfig/caBundle
+      admissionregistration.k8s.io/ValidatingWebhookConfiguration:
+        ignoreDifferences: |
+          jsonPointers:
+          - /webhooks/0/clientConfig/caBundle
+    resource.exclusions: |
+      - apiGroups:
+        - cilium.io
+        kinds:
+        - CiliumIdentity
+        clusters:
+        - "*"
+  rbacConfig:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:learnflow-admin, applications, *, */*, allow
+      p, role:learnflow-admin, projects, *, *, allow
+      p, role:learnflow-admin, clusters, *, *, allow
+      p, role:learnflow-admin, repositories, *, *, allow
+      p, role:learnflow-admin, logs, get, *, allow
+      p, role:learnflow-admin, exec, create, */*, allow
+      g, learnflow-admins, role:learnflow-admin
+      g, learnflow-developers, role:readonly
+  grpc:
+    ingress:
+      enabled: false
+
+repoServer:
+  name: repo-server
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  env:
+    - name: ARGOCD_REPO_SERVER_REPLICAS
+      value: "2"
+    - name: ARGOCD_REPO_SERVER_PARALLELISM
+      value: "10"
+  mountSatellites: true
+  serviceAccount:
+    create: true
+    annotations: {}
+
+redis:
+  name: redis
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+dex:
+  name: dex
+  enabled: false
+
+configs:
+  params:
+    server.insecure: false
+    controller.status.processors: "20"
+    controller.operation.processors: "10"
+    repo.server.parallelism.limit: "10"
+    server.disable.auth: false
+    server.enable.gzip: true
+    appStateManager: "true"
+  cm:
+    admin.enabled: "true"
+    exec.enabled: "true"
+    kustomize.buildOptions: "--enable-helm"
+    timeout.reconciliation: "180s"
+    ui.bannercontent: "LearnFlow Production"
+    ui.bannerurl: https://learnflow.app
+    help.chatUrl: https://learnflow.app/support
+    help.chatText: "LearnFlow Support"
+    repositories: |
+      - type: helm
+        name: argo-cd
+        url: https://argoproj.github.io/argo-helm
+      - type: helm
+        name: kong
+        url: https://charts.konghq.com
+      - type: helm
+        name: dapr
+        url: https://dapr.github.io/helm-charts
+      - type: helm
+        name: bitnami
+        url: https://charts.bitnami.com/bitnami
+
+notifications:
+  enabled: false
+
+applicationset:
+  enabled: true
+  name: applicationset-controller
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  scmProviders:
+    github:
+      enabled: true
+  generators:
+    - scmProvider:
+        github:
+          organization: learnflow
+          api: https://api.github.com/
+
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+# HA configuration
+ha:
+  enabled: true
+  redisProxy:
+    enabled: true
+    replicas: 1
+  redisSentinel:
+    enabled: true
+    replicas: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

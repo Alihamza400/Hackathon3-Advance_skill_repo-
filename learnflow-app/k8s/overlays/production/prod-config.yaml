@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prod-learnflow-config
+data:
+  LOG_LEVEL: warn
+  ENVIRONMENT: production
+  POSTGRES_DB: learnflow

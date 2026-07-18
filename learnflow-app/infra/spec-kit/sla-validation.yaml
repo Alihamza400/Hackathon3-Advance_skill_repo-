@@ -1,0 +1,171 @@
+# SLA Validation Configuration
+# Defines service level agreements for LearnFlow services
+
+sla:
+  version: "1.0.0"
+  project: "learnflow"
+  valid_from: "2025-01-01T00:00:00Z"
+  valid_until: "2025-12-31T23:59:59Z"
+
+  # Service Level Objectives
+  objectives:
+    # Gateway uptime: 99.9%
+    - service: "api-gateway"
+      metric: "uptime"
+      target: 99.9
+      unit: "percent"
+      window: "30d"
+      severity: "critical"
+      description: "API Gateway must be available 99.9% of the time"
+      measurement:
+        type: "prometheus"
+        query: 'avg_over_time(up{service="api-gateway"}[30d]) * 100'
+      consequences:
+        - type: "credit"
+          amount: 5
+          unit: "percent"
+        - type: "escalation"
+          after_minutes: 5
+          channel: "oncall"
+
+    # Service uptime: 99.5%
+    - service: "all-services"
+      metric: "uptime"
+      target: 99.5
+      unit: "percent"
+      window: "30d"
+      severity: "high"
+      description: "All backend microservices must be available 99.5% of the time"
+      measurement:
+        type: "prometheus"
+        query: 'avg_over_time(up{service=~"auth.*|triage.*|concepts.*|code-review.*|debug.*|exercise.*|progress.*"}[30d]) * 100'
+      consequences:
+        - type: "credit"
+          amount: 2
+          unit: "percent"
+        - type: "investigation"
+          trigger_after: 2
+          trigger_unit: "violations"
+          duration: "7d"
+
+    # Response time (P95): <500ms
+    - service: "all-services"
+      metric: "p95_response_time"
+      target: 500
+      unit: "ms"
+      window: "1h"
+      severity: "high"
+      description: "95th percentile response time must be under 500ms"
+      measurement:
+        type: "prometheus"
+        query: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)) * 1000'
+      conditions:
+        - when: "between"
+          start: "08:00"
+          end: "20:00"
+          timezone: "UTC"
+      consequences:
+        - type: "alert"
+          severity: "warning"
+        - type: "auto_scaling"
+          trigger: true
+
+    # Code execution time: <5000ms
+    - service: "debug-agent"
+      metric: "execution_time"
+      target: 5000
+      unit: "ms"
+      window: "5m"
+      severity: "medium"
+      description: "Sandboxed code execution must complete within 5 seconds"
+      measurement:
+        type: "prometheus"
+        query: 'avg_over_time(debug_execution_duration_ms[5m])'
+      consequences:
+        - type: "alert"
+          severity: "warning"
+        - type: "resource_limits"
+          action: "reduce_timeout"
+
+    # Error rate: <1%
+    - service: "all-services"
+      metric: "error_rate"
+      target: 1.0
+      unit: "percent"
+      window: "5m"
+      severity: "critical"
+      description: "HTTP 5xx error rate must be below 1%"
+      measurement:
+        type: "prometheus"
+        query: 'sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100'
+      consequences:
+        - type: "alert"
+          severity: "critical"
+        - type: "auto_rollback"
+          trigger: true
+
+    # Cache hit ratio: >40%
+    - service: "concepts-agent"
+      metric: "cache_hit_ratio"
+      target: 40.0
+      unit: "percent"
+      window: "1h"
+      severity: "low"
+      description: "Cache hit ratio for concept explanations should exceed 40%"
+      measurement:
+        type: "prometheus"
+        query: 'rate(concepts_cache_hits_total[1h]) / (rate(concepts_cache_hits_total[1h]) + rate(concepts_cache_misses_total[1h])) * 100'
+
+    # Exercise grading throughput: >10/min
+    - service: "exercise-agent"
+      metric: "grading_throughput"
+      target: 10
+      unit: "requests_per_minute"
+      window: "5m"
+      severity: "medium"
+      description: "Exercise grading capacity must handle at least 10 submissions per minute"
+      measurement:
+        type: "prometheus"
+        query: 'rate(exercise_grading_requests_total[5m])'
+
+  # Composite SLOs
+  composites:
+    - name: "student_experience"
+      description: "Overall student-facing service quality"
+      formula: "gateway_uptime * 0.3 + service_uptime * 0.3 + response_time * 0.2 + error_rate * 0.2"
+      threshold: 95.0
+      window: "7d"
+
+    - name: "learning_session_reliability"
+      description: "Reliability of a complete learning session (triage -> concept -> exercise)"
+      formula: "triage_uptime * 0.25 + concepts_uptime * 0.25 + exercise_uptime * 0.25 + grading_throughput * 0.25"
+      threshold: 90.0
+      window: "1d"
+
+  # Reporting
+  reporting:
+    schedule: "0 */6 * * *"  # Every 6 hours
+    formats:
+      - type: "html"
+        template: "sla-report.html"
+      - type: "json"
+        destination: "s3://learnflow-reports/sla/"
+    distribution:
+      - email: "eng@learnflow.com"
+      - email: "sre@learnflow.com"
+      - slack: "#sla-reports"
+
+  # Exclusions
+  exclusions:
+    - type: "maintenance"
+      description: "Scheduled maintenance windows"
+      windows:
+        - day: "sunday"
+          start: "02:00"
+          end: "04:00"
+          timezone: "UTC"
+    - type: "known_issue"
+      description: "Known upstream dependency outages"
+      services:
+        - "debug-agent"
+      issue: "AWS Lambda cold start during code execution"

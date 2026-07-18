@@ -1,0 +1,32 @@
+[
+  {
+    "type": "doc",
+    "label": "Introduction",
+    "id": "intro"
+  },
+  {
+    "type": "doc",
+    "label": "Getting Started",
+    "id": "getting-started"
+  },
+  {
+    "type": "doc",
+    "label": "Architecture",
+    "id": "architecture"
+  },
+  {
+    "type": "doc",
+    "label": "API Reference",
+    "id": "api-reference"
+  },
+  {
+    "type": "doc",
+    "label": "Deployment",
+    "id": "deployment"
+  },
+  {
+    "type": "doc",
+    "label": "Contributing",
+    "id": "contributing"
+  }
+]

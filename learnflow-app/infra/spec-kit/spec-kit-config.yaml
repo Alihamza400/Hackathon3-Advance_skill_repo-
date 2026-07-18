@@ -1,0 +1,328 @@
+# Spec-Kit Plus Configuration
+# Integration tests, load testing, chaos engineering, SLA validation
+
+spec_kit_plus:
+  version: "2.0.0"
+  project: "learnflow"
+  environment: "${ENV:development}"
+
+  services:
+    - name: "api-gateway"
+      port: 8000
+      health_endpoint: "/health"
+    - name: "auth-service"
+      port: 8001
+      health_endpoint: "/health"
+    - name: "triage-agent"
+      port: 8002
+      health_endpoint: "/health"
+    - name: "concepts-agent"
+      port: 8003
+      health_endpoint: "/health"
+    - name: "code-review-agent"
+      port: 8004
+      health_endpoint: "/health"
+    - name: "debug-agent"
+      port: 8005
+      health_endpoint: "/health"
+    - name: "exercise-agent"
+      port: 8006
+      health_endpoint: "/health"
+    - name: "progress-agent"
+      port: 8007
+      health_endpoint: "/health"
+    - name: "frontend"
+      port: 3000
+      health_endpoint: "/"
+
+  integration_tests:
+    base_url: "http://localhost:${GATEWAY_PORT:8000}"
+
+    auth:
+      register:
+        method: POST
+        path: "/auth/register"
+        body:
+          email: "test@learnflow.io"
+          password: "TestPass123!"
+          full_name: "Test User"
+        expected_status: 201
+      login:
+        method: POST
+        path: "/auth/login"
+        body:
+          username: "test@learnflow.io"
+          password: "TestPass123!"
+        expected_status: 200
+      me:
+        method: GET
+        path: "/auth/me"
+        auth_required: true
+        expected_status: 200
+
+    triage:
+      classify:
+        method: POST
+        path: "/triage"
+        auth_required: true
+        body:
+          query: "Explain how loops work in Python"
+        expected_status: 200
+      route:
+        method: POST
+        path: "/triage/route"
+        auth_required: true
+        body:
+          query: "Fix this bug: x = 1/0"
+        expected_status: 200
+
+    concepts:
+      explain:
+        method: POST
+        path: "/concepts/explain"
+        auth_required: true
+        body:
+          concept: "function"
+          level: "beginner"
+        expected_status: 200
+      list:
+        method: GET
+        path: "/concepts/list"
+        auth_required: true
+        expected_status: 200
+
+    code_review:
+      review:
+        method: POST
+        path: "/code-review/review"
+        auth_required: true
+        body:
+          code: "def add(a, b):\n    return a + b"
+        expected_status: 200
+      syntax:
+        method: POST
+        path: "/code-review/syntax"
+        auth_required: true
+        body:
+          code: "print('hello')"
+        expected_status: 200
+
+    debug:
+      debug:
+        method: POST
+        path: "/debug"
+        auth_required: true
+        body:
+          code: "print(x)"
+          error_message: "NameError: name 'x' is not defined"
+        expected_status: 200
+      execute:
+        method: POST
+        path: "/debug/execute"
+        auth_required: true
+        body:
+          code: "print('hello world')"
+        expected_status: 200
+
+    exercise:
+      generate:
+        method: POST
+        path: "/exercises/generate"
+        auth_required: true
+        body:
+          topic: "loop"
+          difficulty: "beginner"
+          count: 1
+        expected_status: 200
+      submit:
+        method: POST
+        path: "/exercises/submit"
+        auth_required: true
+        body:
+          exercise_id: "${EXERCISE_ID}"
+          code: "for i in range(5): print(i)"
+        expected_status: 200
+
+    progress:
+      record_event:
+        method: POST
+        path: "/progress/events"
+        auth_required: true
+        body:
+          event_type: "exercise_completed"
+          topic_id: "functions"
+        expected_status: 201
+      dashboard:
+        method: GET
+        path: "/progress/dashboard"
+        auth_required: true
+        expected_status: 200
+      streak:
+        method: GET
+        path: "/progress/streak"
+        auth_required: true
+        expected_status: 200
+
+  load_testing:
+    scenarios:
+      - name: "health_checks"
+        description: "Health check polling for all services"
+        type: "constant"
+        users: 50
+        duration_seconds: 60
+        endpoints:
+          - method: GET
+            path: "/health"
+
+      - name: "auth_flow"
+        description: "Registration and login flow"
+        type: "ramp"
+        users_start: 10
+        users_end: 100
+        duration_seconds: 120
+        endpoints:
+          - method: POST
+            path: "/auth/register"
+          - method: POST
+            path: "/auth/login"
+
+      - name: "triage_flow"
+        description: "Student query triage"
+        type: "spike"
+        target_users: 200
+        spike_seconds: 30
+        endpoints:
+          - method: POST
+            path: "/triage"
+            body:
+              query: "What is a variable in Python?"
+
+      - name: "concept_queries"
+        description: "Concept explanation requests"
+        type: "constant"
+        users: 75
+        duration_seconds: 180
+        endpoints:
+          - method: POST
+            path: "/concepts/explain"
+            body:
+              concept: "function"
+              level: "beginner"
+
+      - name: "code_review_load"
+        description: "Code review submissions"
+        type: "ramp"
+        users_start: 5
+        users_end: 50
+        duration_seconds: 120
+        endpoints:
+          - method: POST
+            path: "/code-review/review"
+            body:
+              code: "def fib(n):\n    if n <= 1:\n        return n\n    return fib(n-1) + fib(n-2)"
+
+      - name: "debug_requests"
+        description: "Debug agent requests"
+        type: "constant"
+        users: 40
+        duration_seconds: 120
+        endpoints:
+          - method: POST
+            path: "/debug"
+            body:
+              code: "def div(a,b): return a/b"
+              error_message: "ZeroDivisionError: division by zero"
+
+      - name: "exercise_generation"
+        description: "Exercise generation and submission"
+        type: "ramp"
+        users_start: 20
+        users_end: 80
+        duration_seconds: 180
+        endpoints:
+          - method: POST
+            path: "/exercises/generate"
+            body:
+              topic: "loop"
+              difficulty: "beginner"
+              count: 3
+
+  chaos_engineering:
+    scenarios:
+      - name: "auth_service_failure"
+        description: "Simulate auth service outage"
+        type: "service_kill"
+        service: "auth-service"
+        duration_seconds: 30
+        expected_behavior: "Gateway returns 503 for auth-dependent routes"
+
+      - name: "triage_latency"
+        description: "Inject latency into triage agent"
+        type: "latency_injection"
+        service: "triage-agent"
+        latency_ms: 2000
+        duration_seconds: 60
+        expected_behavior: "Gateway times out, returns cached classification"
+
+      - name: "redis_cache_miss"
+        description: "Flush Redis cache under load"
+        type: "cache_flush"
+        target: "redis"
+        during_scenario: "concept_queries"
+        expected_behavior: "Services degrade gracefully with increased latency"
+
+      - name: "network_partition"
+        description: "Partition gateway from services"
+        type: "network_drop"
+        target: "api-gateway"
+        drop_percentage: 30
+        duration_seconds: 45
+        expected_behavior: "Partial failures, retries, circuit breaker opens"
+
+  sla_validation:
+    config_file: "sla-validation.yaml"
+    check_interval_seconds: 30
+    alert_on_violation: true
+    notification_channels:
+      - type: "slack"
+        webhook: "${SLACK_WEBHOOK_URL}"
+      - type: "pagerduty"
+        routing_key: "${PAGERDUTY_ROUTING_KEY}"
+
+  performance_benchmarks:
+    targets:
+      - service: "api-gateway"
+        metrics:
+          - name: "requests_per_second"
+            baseline: 500
+            threshold_percent: 80
+          - name: "p95_latency_ms"
+            baseline: 200
+            threshold_percent: 120
+
+      - service: "triage-agent"
+        metrics:
+          - name: "classification_latency_ms"
+            baseline: 100
+            threshold_percent: 120
+          - name: "throughput_rps"
+            baseline: 300
+            threshold_percent: 80
+
+      - service: "concepts-agent"
+        metrics:
+          - name: "explanation_latency_ms"
+            baseline: 150
+            threshold_percent: 120
+          - name: "cache_hit_ratio"
+            baseline: 0.6
+            threshold_percent: 80
+
+      - service: "debug-agent"
+        metrics:
+          - name: "execution_latency_ms"
+            baseline: 500
+            threshold_percent: 120
+          - name: "sandbox_throughput"
+            baseline: 50
+            threshold_percent: 80

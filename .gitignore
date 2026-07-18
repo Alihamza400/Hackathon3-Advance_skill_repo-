@@ -29,9 +29,6 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Documentation generated
-learnflow-app/docs/
-
 # Binary / large
 *.pdf
 *.zip
@@ -42,6 +39,3 @@ learnflow-app/docs/
 
 # Docker
 .docker/
-
-# K8s generated
-learnflow-app/k8s/overlays/

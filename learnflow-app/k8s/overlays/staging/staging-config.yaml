@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: staging-learnflow-config
+data:
+  LOG_LEVEL: info
+  ENVIRONMENT: staging
+  POSTGRES_DB: learnflow_staging
