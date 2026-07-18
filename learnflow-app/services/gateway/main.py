@@ -32,15 +32,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Service registry
+# Service registry (use env vars for K8s, fallback to localhost for dev)
 SERVICES = {
-    "triage": "http://triage-agent:8000",
-    "concepts": "http://concepts-agent:8000",
-    "code-review": "http://code-review-agent:8000",
-    "debug": "http://debug-agent:8000",
-    "exercise": "http://exercise-agent:8000",
-    "progress": "http://progress-agent:8000",
-    "auth": "http://auth-service:8000",
+    "triage": os.getenv("TRIAGE_URL", "http://localhost:8002"),
+    "concepts": os.getenv("CONCEPTS_URL", "http://localhost:8003"),
+    "code-review": os.getenv("CODE_REVIEW_URL", "http://localhost:8004"),
+    "debug": os.getenv("DEBUG_URL", "http://localhost:8005"),
+    "exercise": os.getenv("EXERCISE_URL", "http://localhost:8006"),
+    "progress": os.getenv("PROGRESS_URL", "http://localhost:8007"),
+    "auth": os.getenv("AUTH_URL", "http://localhost:8001"),
 }
 
 # Health checks
@@ -253,11 +253,18 @@ async def services_status():
 # ============================================
 
 @app.post("/auth/login")
-async def login(
-    request: Request,
-    credentials: Dict[str, str]
-):
-    """Proxy login to auth service"""
+async def login(request: Request):
+    """Proxy login to auth service (supports both JSON and form-encoded)"""
+    ct = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in ct:
+        body = await request.body()
+        response = await gateway_client.request(
+            "auth", "POST", "/auth/login",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        return response.json()
+    credentials = await request.json()
     response = await gateway_client.request(
         "auth", "POST", "/auth/login",
         json=credentials
