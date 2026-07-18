@@ -4,10 +4,10 @@ FROM python:3.12-slim
 WORKDIR /app
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-COPY services/ ./services/
+COPY services/requirements.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-RUN pip install --no-cache-dir -r services/shared/requirements.txt 2>/dev/null || true
-RUN pip install --no-cache-dir fastapi uvicorn pydantic-settings asyncpg redis prometheus-client httpx "passlib[bcrypt]" pyjwt python-multipart email-validator python-dotenv
+COPY services/ ./services/
 
 ENV PYTHONPATH=/app/services
 EXPOSE 8000
