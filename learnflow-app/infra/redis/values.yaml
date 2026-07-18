@@ -1,0 +1,113 @@
+# Enterprise Redis Configuration for LearnFlow
+architecture: replication
+
+auth:
+  enabled: true
+  password: "redis_secure_password_change_in_production"
+  existingSecret: ""
+
+master:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: "gp3"
+
+replica:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: "gp3"
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    namespace: monitoring
+
+sentinel:
+  enabled: true
+  quorum: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+cluster:
+  enabled: false
+
+security:
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      issuer: letsencrypt-prod
+
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: learnflow
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 26379
+
+sysctlImage:
+  enabled: true
+  mountSysctl: true
+
+sysctl:
+  vm.overcommit_memory: "1"
+  net.core.somaxconn: "1024"
+
+pdb:
+  enabled: true
+  minAvailable: 50%
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    namespace: monitoring
+
+# Redis configuration for Dapr
+redis:
+  maxmemory: "512mb"
+  maxmemory_policy: "allkeys-lru"
+  save: ""
+  appendonly: "yes"
+  appendfsync: "everysec"
+  maxclients: "10000"
+  timeout: "300"
+  tcp_keepalive: "60"
+  tcp_backlog: "511"
+  databases: "16"
+  lazyfree_lazy_eviction: "yes"
+  lazyfree_lazy_expire: "yes"
+  lazyfree_lazy_server_del: "yes"
+  lazyfree_lazy_user_del: "yes"
+  lazyfree_lazy_user_flush: "yes"

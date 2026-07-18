@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: learnflow-app-ingress
+  labels:
+    app.kubernetes.io/name: learnflow-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: learnflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: learnflow-app
+              port:
+                number: 8000

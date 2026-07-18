@@ -1,0 +1,79 @@
+# LearnFlow Kubernetes Base Configuration
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: learnflow
+  labels:
+    app: learnflow
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dapr-system
+  labels:
+    app: dapr
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kafka-credentials
+  namespace: learnflow
+type: Opaque
+stringData:
+  username: "learnflow"
+  password: "kafka_secure_password_change_in_production"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: learnflow
+type: Opaque
+stringData:
+  connectionString: "postgresql://learnflow:learnflow_secure_password_change_in_production@postgresql-primary.learnflow.svc.cluster.local:5432/learnflow?sslmode=require"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kafka-tls
+  namespace: learnflow
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Kafka CA certificate - replace with actual cert
+    -----END CERTIFICATE-----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jwt-secret
+  namespace: learnflow
+type: Opaque
+stringData:
+  secret: "jwt-secret-change-in-production-min-32-chars"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learnflow-config
+  namespace: learnflow
+data:
+  LOG_LEVEL: "info"
+  ENVIRONMENT: "production"
+  KAFKA_BROKERS: "kafka.learnflow.svc.cluster.local:9092"
+  POSTGRES_HOST: "postgresql-primary.learnflow.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "learnflow"
+  REDIS_HOST: "redis-master.learnflow.svc.cluster.local"
+  REDIS_PORT: "6379"
+  DAPR_HTTP_PORT: "3500"
+  DAPR_GRPC_PORT: "50001"

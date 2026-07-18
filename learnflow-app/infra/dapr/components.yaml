@@ -1,0 +1,220 @@
+# Dapr Components for LearnFlow
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: learnflow
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: "redis-master.learnflow.svc.cluster.local:6379"
+  - name: redisPassword
+    secretKeyRef:
+      name: redis
+      key: redis-password
+  - name: enableTLS
+    value: "true"
+  - name: keyPrefix
+    value: "learnflow:"
+  - name: maxRetries
+    value: "3"
+  - name: retryInterval
+    value: "100ms"
+  - name: failover
+    value: "true"
+  - name: sentinelMasterName
+    value: "mymaster"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub
+  namespace: learnflow
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: "redis-master.learnflow.svc.cluster.local:6379"
+  - name: redisPassword
+    secretKeyRef:
+      name: redis
+      key: redis-password
+  - name: enableTLS
+    value: "true"
+  - name: consumerID
+    value: "learnflow-consumer"
+  - name: enableRetry
+    value: "true"
+  - name: retryInterval
+    value: "100ms"
+  - name: maxRetries
+    value: "3"
+  - name: sentinelMasterName
+    value: "mymaster"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: secretstore
+  namespace: learnflow
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata:
+  - name: namespace
+    value: "learnflow"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: configuration
+  namespace: learnflow
+spec:
+  type: configuration.kubernetes
+  version: v1
+  metadata:
+  - name: namespace
+    value: "learnflow"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-binding
+  namespace: learnflow
+spec:
+  type: bindings.kafka
+  version: v1
+  metadata:
+  - name: topics
+    value: "learning.events,code.executions,exercise.submissions,struggle.alerts"
+  - name: brokers
+    value: "kafka.learnflow.svc.cluster.local:9092"
+  - name: consumerGroup
+    value: "learnflow-consumer"
+  - name: authRequired
+    value: "true"
+  - name: saslUsername
+    secretKeyRef:
+      name: kafka-credentials
+      key: username
+  - name: saslPassword
+    secretKeyRef:
+      name: kafka-credentials
+      key: password
+  - name: authType
+    value: "sasl"
+  - name: saslMechanism
+    value: "SCRAM-SHA-512"
+  - name: tls
+    secretKeyRef:
+      name: kafka-tls
+      key: ca.crt
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: postgres-binding
+  namespace: learnflow
+spec:
+  type: bindings.postgresql
+  version: v1
+  metadata:
+  - name: connectionString
+    secretKeyRef:
+      name: postgres-credentials
+      key: connectionString
+  - name: tableName
+    value: "learnflow_events"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: appconfig
+  namespace: learnflow
+spec:
+  tracing:
+    samplingRate: "1"
+    zipkin:
+      endpointAddress: "http://zipkin.observability.svc.cluster.local:9411/api/v2/spans"
+  metric:
+    enabled: true
+    prometheus:
+      port: 9090
+      path: "/metrics"
+  mtls:
+    enabled: true
+    workloadCertTTL: "24h"
+    allowedClockSkew: "15m"
+  middleware:
+    - name: rate-limit
+      type: middleware.http.ratelimit
+      metadata:
+      - name: requestsPerSecond
+        value: "100"
+      - name: burst
+        value: "200"
+    - name: cors
+      type: middleware.http.cors
+      metadata:
+      - name: allowedOrigins
+        value: "https://app.learnflow.com,https://docs.learnflow.com"
+      - name: allowedMethods
+        value: "GET,POST,PUT,DELETE,OPTIONS"
+      - name: allowedHeaders
+        value: "Authorization,Content-Type,X-Request-ID"
+      - name: exposeHeaders
+        value: "X-Request-ID"
+      - name: maxAge
+        value: "3600"
+      - name: credentials
+        value: "true"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: learning-events-subscription
+  namespace: learnflow
+spec:
+  topic: learning.events
+  route: /learning/events
+  pubsubname: pubsub
+  routes:
+    rules:
+      - match: event.type == "lesson.completed"
+        path: /learning/completed
+      - match: event.type == "quiz.submitted"
+        path: /learning/quiz
+    default: /learning/default
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: code-executions-subscription
+  namespace: learnflow
+spec:
+  topic: code.executions
+  route: /code/execute
+  pubsubname: pubsub
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: exercise-submissions-subscription
+  namespace: learnflow
+spec:
+  topic: exercise.submissions
+  route: /exercises/submit
+  pubsubname: pubsub
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: struggle-alerts-subscription
+  namespace: learnflow
+spec:
+  topic: struggle.alerts
+  route: /struggle/alert
+  pubsubname: pubsub

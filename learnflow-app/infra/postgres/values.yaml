@@ -1,0 +1,154 @@
+# Enterprise PostgreSQL Configuration for LearnFlow
+architecture: replication
+
+primary:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: "gp3"
+
+replica:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: "gp3"
+
+postgresql:
+  username: learnflow
+  password: "learnflow_secure_password_change_in_production"
+  database: learnflow
+  extendedConf:
+    max_connections: "200"
+    shared_buffers: "256MB"
+    effective_cache_size: "1GB"
+    maintenance_work_mem: "128MB"
+    checkpoint_completion_target: "0.9"
+    wal_buffers: "16MB"
+    default_statistics_target: "100"
+    random_page_cost: "1.1"
+    effective_io_concurrency: "200"
+    work_mem: "4MB"
+    min_wal_size: "1GB"
+    max_wal_size: "4GB"
+    max_worker_processes: "8"
+    max_parallel_workers_per_gather: "4"
+    max_parallel_workers: "8"
+    max_parallel_maintenance_workers: "4"
+    wal_level: "replica"
+    max_wal_senders: "10"
+    wal_keep_segments: "64"
+    wal_keep_size: "1GB"
+    hot_standby: "on"
+    hot_standby_feedback: "on"
+    synchronous_commit: "on"
+    synchronous_standby_names: "*"
+    wal_receiver_status_interval: "10s"
+    log_min_duration_statement: "1000"
+    log_checkpoints: "on"
+    log_connections: "on"
+    log_disconnections: "on"
+    log_lock_waits: "on"
+    log_temp_files: "1024"
+    log_autovacuum_min_duration: "1000"
+    log_line_prefix: '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_timezone: 'UTC'
+    timezone: 'UTC'
+    datestyle: 'iso, mdy'
+
+replication:
+  enabled: true
+  synchronous: true
+  numSynchronousReplicas: 1
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    namespace: monitoring
+
+pgpool:
+  enabled: false
+
+pgbouncer:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  poolMode: transaction
+  maxClientConn: 100
+  defaultPoolSize: 20
+  minPoolSize: 5
+  reservePoolSize: 5
+  reservePoolTimeout: 5
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: "30d"
+  storage:
+    type: s3
+    bucket: "learnflow-db-backups"
+    region: "us-east-1"
+    encryption: true
+  pgBackRest:
+    repo1_type: s3
+    repo1_s3_bucket: learnflow-db-backups
+    repo1_s3_region: us-east-1
+    repo1_cipher_type: aes256
+    repo1_cipher_pass: "backup_encryption_key_change_in_production"
+    repo1_retention_full: "30"
+    repo1_retention_diff: "7"
+
+pdb:
+  enabled: true
+  minAvailable: 50%
+
+security:
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      issuer: letsencrypt-prod
+  postgresql:
+    authentication:
+      method: scram-sha-256
+
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: learnflow
+      ports:
+        - protocol: TCP
+          port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187

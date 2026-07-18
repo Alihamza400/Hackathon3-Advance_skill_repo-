@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-connection-{{ .Release.Name }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: hook-succeeded,hook-failed
+  spec:
+    restartPolicy: Never
+    containers:
+      - name: wget
+        image: busybox
+        command: ['sh', '-c', 'wget -qO- http://{{ .Release.Name }}-learnflow-app:8000/health | grep -q ok && exit 0 || exit 1']
+    securityContext:
+      imagePullPolicy: IfNotPresent
