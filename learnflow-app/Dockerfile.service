@@ -1,0 +1,14 @@
+# LearnFlow — Generic Microservice Docker Image
+FROM python:3.12-slim
+
+WORKDIR /app
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
+COPY services/ ./services/
+
+RUN pip install --no-cache-dir -r services/shared/requirements.txt 2>/dev/null || true
+RUN pip install --no-cache-dir fastapi uvicorn pydantic-settings asyncpg redis prometheus-client httpx "passlib[bcrypt]" pyjwt python-multipart email-validator python-dotenv
+
+ENV PYTHONPATH=/app/services
+EXPOSE 8000
+CMD ["sh", "-c", "exec python services/${SERVICE_NAME}/main.py"]
