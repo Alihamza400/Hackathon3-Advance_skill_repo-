@@ -22,10 +22,10 @@ export function Navbar() {
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <Link href="/" className="group flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 shadow-sm transition-transform duration-300 group-hover:scale-110">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/20 transition-all duration-300 group-hover:scale-110 group-hover:shadow-blue-500/40">
               <GraduationCap className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-lg hidden sm:inline bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">LearnFlow</span>
+            <span className="font-bold text-lg hidden sm:inline">Learn<span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Flow</span></span>
           </Link>
         </div>
 
