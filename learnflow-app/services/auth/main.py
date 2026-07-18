@@ -1,13 +1,14 @@
 # Auth Service - Authentication and Authorization
 # LearnFlow AI Tutoring Platform
 
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any, List
 from enum import Enum
 from datetime import datetime, timezone, timedelta
+import os
 import uuid
 import hashlib
 import secrets
@@ -24,7 +25,7 @@ settings.service_name = "auth-service"
 app = create_app("auth-service", "Auth Service - Authentication & Authorization")
 
 # JWT Configuration
-SECRET_KEY = settings.jwt_secret if hasattr(settings, 'jwt_secret') else "learnflow-secret-change-in-production"
+SECRET_KEY = settings.jwt_secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = 30
@@ -612,4 +613,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     dapr_grpc_port: int = int(os.getenv("DAPR_GRPC_PORT", "50001"))
     
     # JWT
-    jwt_secret: str = os.getenv("JWT_SECRET", "change-me")
+    jwt_secret: str = os.getenv("JWT_SECRET", "learnflow-jwt-secret-key-change-in-production")
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 60 * 24  # 24 hours
     
@@ -108,16 +108,23 @@ _redis_client: Optional[redis.Redis] = None
 async def get_db_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
-        _pool = await asyncpg.create_pool(
-            host=settings.postgres_host,
-            port=settings.postgres_port,
-            database=settings.postgres_db,
-            user=settings.postgres_user,
-            password=settings.postgres_password,
-            min_size=5,
-            max_size=20,
-            command_timeout=60,
-        )
+        try:
+            _pool = await asyncio.wait_for(
+                asyncpg.create_pool(
+                    host=settings.postgres_host,
+                    port=settings.postgres_port,
+                    database=settings.postgres_db,
+                    user=settings.postgres_user,
+                    password=settings.postgres_password,
+                    min_size=1,
+                    max_size=5,
+                    command_timeout=5,
+                ),
+                timeout=5
+            )
+        except asyncio.TimeoutError:
+            logger.warning("DB connection timed out, running without database")
+            _pool = None
     return _pool
 
 
@@ -131,14 +138,21 @@ async def close_db_pool():
 async def get_redis() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.Redis(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            password=settings.redis_password or None,
-            ssl=settings.redis_ssl,
-            decode_responses=True,
-            max_connections=20,
-        )
+        try:
+            _redis_client = redis.Redis(
+                host=settings.redis_host,
+                port=settings.redis_port,
+                password=settings.redis_password or None,
+                ssl=settings.redis_ssl,
+                decode_responses=True,
+                max_connections=5,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            await asyncio.wait_for(_redis_client.ping(), timeout=3)
+        except (asyncio.TimeoutError, redis.ConnectionError, OSError) as e:
+            logger.warning(f"Redis connection failed: {e}, running without cache")
+            _redis_client = None
     return _redis_client
 
 
@@ -327,15 +341,19 @@ async def logging_middleware(request: Request, call_next):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     logger.info(f"Starting {settings.service_name}")
-    await get_db_pool()
-    await get_redis()
+    try:
+        await asyncio.wait_for(get_db_pool(), timeout=3)
+    except Exception as e:
+        logger.warning(f"DB unavailable: {e}")
+    try:
+        await asyncio.wait_for(get_redis(), timeout=3)
+    except Exception as e:
+        logger.warning(f"Redis unavailable: {e}")
     logger.info(f"{settings.service_name} started")
-    
+
     yield
-    
-    # Shutdown
+
     logger.info(f"Shutting down {settings.service_name}")
     await close_db_pool()
     await close_redis()
@@ -457,25 +475,45 @@ async def fetch_val(query: str, *args):
 
 async def cache_get(key: str) -> Optional[Any]:
     client = await get_redis()
-    data = await client.get(key)
-    return json.loads(data) if data else None
+    if client is None:
+        return None
+    try:
+        data = await client.get(key)
+        return json.loads(data) if data else None
+    except Exception:
+        return None
 
 
 async def cache_set(key: str, value: Any, ttl: int = 3600) -> None:
     client = await get_redis()
-    await client.setex(key, ttl, json.dumps(value, default=str))
+    if client is None:
+        return
+    try:
+        await client.setex(key, ttl, json.dumps(value, default=str))
+    except Exception:
+        pass
 
 
 async def cache_delete(key: str) -> None:
     client = await get_redis()
-    await client.delete(key)
+    if client is None:
+        return
+    try:
+        await client.delete(key)
+    except Exception:
+        pass
 
 
 async def cache_delete_pattern(pattern: str) -> None:
     client = await get_redis()
-    keys = await client.keys(pattern)
-    if keys:
-        await client.delete(*keys)
+    if client is None:
+        return
+    try:
+        keys = await client.keys(pattern)
+        if keys:
+            await client.delete(*keys)
+    except Exception:
+        pass
 
 
 # ============================================
