@@ -18,7 +18,7 @@ import type {
   ProgressEvent,
 } from '@/types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api'
+const API_BASE = '/api'
 
 class ApiClient {
   private client: AxiosInstance

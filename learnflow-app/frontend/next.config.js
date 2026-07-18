@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const UPSTREAM = process.env.UPSTREAM_API_URL || 'http://localhost:8000';
+
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
@@ -7,7 +9,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/:path*`,
+        destination: `${UPSTREAM}/:path*`,
       },
     ];
   },

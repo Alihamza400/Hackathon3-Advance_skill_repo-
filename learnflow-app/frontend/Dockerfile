@@ -6,6 +6,8 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 FROM node:20-alpine AS builder
+ARG UPSTREAM_API_URL
+ENV UPSTREAM_API_URL=${UPSTREAM_API_URL}
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
