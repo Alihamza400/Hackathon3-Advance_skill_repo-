@@ -1,266 +1,153 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Spinner } from '@/components/ui/Spinner'
+import { motion, AnimatePresence } from 'framer-motion'
+import { GlassCard } from '@/components/ui/GlassCard'
+import { GlowButton } from '@/components/ui/GlowButton'
 import { api } from '@/lib/api'
 import { formatRelativeTime } from '@/lib/utils'
-import { Send, Bot, User, Lightbulb, Bug, Code, FileCode, BarChart3 } from 'lucide-react'
-import type { ChatMessage, TriageResponse } from '@/types'
+import { Send, Bot, User, Sparkles } from 'lucide-react'
+import type { ChatMessage } from '@/types'
 
-const queryIcons = {
-  explain: Lightbulb,
-  debug: Bug,
-  code_review: Code,
-  exercise: FileCode,
-  progress: BarChart3,
-  general: Bot,
-}
-
-function getQueryIcon(type: string) {
-  const Icon = queryIcons[type as keyof typeof queryIcons] || Bot
-  return <Icon className="h-5 w-5" />
-}
+const quickPrompts = [
+  'explain polymorphism', 'debug: print(1/0)',
+  'how do lists work?', 'generate exercise on functions',
+]
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([{
     id: 'welcome',
     role: 'assistant',
-    content: 'Hello! I\'m your AI Python tutor. Ask me anything about Python — I can explain concepts, debug code, review code, generate exercises, or track your progress. What would you like help with?',
+    content: '## 🎓 LearnFlow AI Tutor\n\nI can help you:\n- **Explain** anything — "explain polymorphism"\n- **Debug** code — paste code with errors\n- **Practice** — "generate an exercise on lists"\n\nPowered by AI via OpenRouter. Ask anything!',
     timestamp: new Date().toISOString(),
   }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [thinking, setThinking] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, thinking])
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   async function handleSend() {
     const query = input.trim()
     if (!query || loading) return
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: query,
-      timestamp: new Date().toISOString(),
-    }
-
-    setMessages(prev => [...prev, userMessage])
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: query, timestamp: new Date().toISOString() }
+    setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
-    setThinking('Analyzing your query...')
 
     try {
-      const triage: TriageResponse = await api.triageQuery({ query })
-      setThinking(`Routing to ${triage.routed_to}...`)
+      const token = localStorage.getItem('access_token')
+      const resp = await fetch('/api/concepts/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ concept: query.replace(/^(explain|what is|how does|tell me about)\s+/i, '').trim(), level: 'beginner' }),
+      })
 
-      let responseContent = ''
-      switch (triage.query_type) {
-        case 'explain': {
-          const explain = await api.explainConcept(query)
-          responseContent = formatExplanation(explain)
-          break
+      if (resp.ok) {
+        const data = await resp.json()
+        const e = data.explanation
+        let content = `## 📚 ${e.concept.charAt(0).toUpperCase() + e.concept.slice(1)}\n\n**${e.definition}**\n\n${e.explanation}\n`
+        if (e.code_examples?.length) {
+          content += '\n### Code Examples\n'
+          for (const ex of e.code_examples) content += `\n**${ex.title}**\n\`\`\`python\n${ex.code}\n\`\`\`\n${ex.explanation}\n`
         }
-        case 'debug': {
-          const debug = await api.debugCode(query)
-          responseContent = formatDebugResult(debug)
-          break
-        }
-        case 'code_review': {
-          const review = await api.reviewCode(query)
-          responseContent = formatCodeReview(review)
-          break
-        }
-        case 'exercise': {
-          const exercises = await api.generateExercises('python')
-          responseContent = formatExercises(exercises)
-          break
-        }
-        case 'progress': {
-          const dash = await api.getDashboard()
-          responseContent = formatDashboard(dash)
-          break
-        }
-        default: {
-          responseContent = `I understood your question as a general query. Here's what I found:\n\n${triage.reasoning}\n\nCould you be more specific? I can help with explaining concepts, debugging code, code review, exercises, or tracking progress.`
-        }
+        if (e.key_points?.length) content += `\n### Key Points\n- ${e.key_points.slice(0, 3).join('\n- ')}\n`
+        if (e.related_concepts?.length) content += `\n*Related: ${e.related_concepts.join(', ')}*\n`
+        content += `\n---\n*${e.metadata?.source === 'llm' ? '🤖 AI-generated' : '📖 From knowledge base'}*`
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content, timestamp: new Date().toISOString() }])
+      } else {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(), role: 'assistant',
+          content: 'I couldn\'t find that concept. Try being more specific, or ask me about variables, functions, classes, decorators, recursion, etc.',
+          timestamp: new Date().toISOString(),
+        }])
       }
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: responseContent,
-        timestamp: new Date().toISOString(),
-        metadata: { query_type: triage.query_type, routed_to: triage.routed_to },
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
     } catch (e) {
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: e instanceof Error ? `Error: ${e.message}` : 'Something went wrong. Please try again.',
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(), role: 'assistant',
+        content: e instanceof Error ? `Error: ${e.message}` : 'Something went wrong.',
         timestamp: new Date().toISOString(),
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setLoading(false)
-      setThinking(null)
-    }
+      }])
+    } finally { setLoading(false) }
   }
 
   return (
-    <Card className="flex flex-col h-[600px]">
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-            {msg.role !== 'user' && (
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-            )}
-            <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-1' : ''}`}>
-              <div
-                className={`rounded-xl px-4 py-2.5 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary'
-                }`}
-              >
-                <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-                  {msg.content}
+    <GlassCard className="flex flex-col h-[600px]">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+        <AnimatePresence>
+          {messages.map((msg) => (
+            <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+              {msg.role !== 'user' && (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <Bot className="h-4 w-4 text-white" />
                 </div>
+              )}
+              <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-1' : ''}`}>
+                <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                    : 'bg-secondary/80 border border-white/10'
+                }`}>
+                  <div className="prose prose-sm max-w-none whitespace-pre-wrap [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg">{msg.content}</div>
+                </div>
+                <p className={`text-xs text-muted-foreground mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                  {formatRelativeTime(msg.timestamp)}
+                </p>
               </div>
-              <p className={`text-xs text-muted-foreground mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
-                {formatRelativeTime(msg.timestamp)}
-                {(msg.metadata?.query_type as string) && (
-                  <span className="ml-2 inline-flex items-center gap-1">
-                    {getQueryIcon(msg.metadata?.query_type as string)}
-                  </span>
-                )}
-              </p>
-            </div>
-            {msg.role === 'user' && (
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                <User className="h-4 w-4 text-white" />
-              </div>
-            )}
-          </div>
-        ))}
+              {msg.role === 'user' && (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
-        {thinking && (
-          <div className="flex gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-primary" />
+        {loading && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-white" />
             </div>
-            <div className="bg-secondary rounded-xl px-4 py-2.5 text-sm flex items-center gap-2">
-              <Spinner size="sm" />
-              {thinking}
+            <div className="bg-secondary/80 rounded-2xl px-4 py-3 text-sm border border-white/10 flex items-center gap-3">
+              <div className="flex gap-1">
+                <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="h-2 w-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              AI is thinking...
             </div>
+          </motion.div>
+        )}
+
+        {/* Quick prompts */}
+        {messages.length === 1 && !loading && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {quickPrompts.map(p => (
+              <button key={p} onClick={() => { setInput(p); setTimeout(handleSend, 100) }}
+                className="px-3 py-1.5 rounded-full bg-secondary/60 border border-white/10 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-all">
+                {p}
+              </button>
+            ))}
           </div>
         )}
 
         <div ref={messagesEndRef} />
-      </CardContent>
+      </div>
 
-      <div className="border-t p-4">
+      <div className="border-t border-white/10 p-4">
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
+          <input type="text" value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            placeholder="Ask about Python concepts, debugging, code review..."
-            className="flex-1 h-10 rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={loading}
-          />
-          <Button onClick={handleSend} disabled={loading || !input.trim()} size="sm">
+            placeholder="Ask about any Python concept..."
+            className="flex-1 h-12 rounded-xl border border-white/20 bg-gradient-to-r from-white/50 to-white/30 dark:from-white/5 dark:to-white/[0.02] backdrop-blur px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            disabled={loading} />
+          <GlowButton onClick={handleSend} disabled={loading || !input.trim()} size="sm">
             <Send className="h-4 w-4" />
-          </Button>
+          </GlowButton>
         </div>
       </div>
-    </Card>
+    </GlassCard>
   )
-}
-
-function formatExplanation(explain: { explanation: { definition: string; explanation: string; key_points: string[]; code_examples: { title: string; code: string; explanation: string }[]; common_mistakes: string[]; related_concepts: string[]; analogies: string[] } }): string {
-  const e = explain.explanation
-  let text = `## ${e.definition}\n\n${e.explanation}\n`
-
-  if (e.analogies.length) {
-    text += `\n### 💡 Analogies\n- ${e.analogies.join('\n- ')}\n`
-  }
-
-  if (e.key_points.length) {
-    text += `\n### Key Points\n- ${e.key_points.join('\n- ')}\n`
-  }
-
-  if (e.code_examples.length) {
-    text += `\n### Code Examples\n`
-    for (const ex of e.code_examples) {
-      text += `\n**${ex.title}**\n\`\`\`python\n${ex.code}\n\`\`\`\n${ex.explanation}\n`
-    }
-  }
-
-  if (e.common_mistakes.length) {
-    text += `\n### Common Mistakes\n- ${e.common_mistakes.join('\n- ')}\n`
-  }
-
-  if (e.related_concepts.length) {
-    text += `\n### Related Concepts\n${e.related_concepts.join(', ')}\n`
-  }
-
-  return text
-}
-
-function formatDebugResult(debug: { error_type: string; error_message: string; explanation: string; suggestion: string; hints: string[]; line_number?: number }): string {
-  let text = `### 🔍 Debug Analysis\n\n`
-  text += `**Error Type:** ${debug.error_type}\n`
-  if (debug.line_number) text += `**Line:** ${debug.line_number}\n`
-  text += `**Message:** ${debug.error_message}\n\n`
-  text += `**Explanation:** ${debug.explanation}\n\n`
-  text += `**Suggestion:** ${debug.suggestion}\n`
-  if (debug.hints.length) {
-    text += `\n**Hints:**\n- ${debug.hints.join('\n- ')}\n`
-  }
-  return text
-}
-
-function formatCodeReview(review: { issues: { severity: string; category: string; line: number; message: string; suggestion?: string }[]; summary: { total_issues: number; overall_score: number } }): string {
-  let text = `### 📝 Code Review\n\n`
-  text += `**Score:** ${review.summary.overall_score}/100 | **Issues Found:** ${review.summary.total_issues}\n\n`
-
-  for (const issue of review.issues) {
-    text += `**Line ${issue.line}** [${issue.severity.toUpperCase()}] [${issue.category}]\n`
-    text += `${issue.message}\n`
-    if (issue.suggestion) text += `  → ${issue.suggestion}\n`
-    text += '\n'
-  }
-
-  return text
-}
-
-function formatExercises(exercises: { id: string; title: string; description: string; difficulty: string; topic: string; time_estimate_minutes: number }[]): string {
-  let text = `### 📚 Practice Exercises\n\n`
-  for (const ex of exercises) {
-    text += `**${ex.title}** (${ex.difficulty})\n`
-    text += `${ex.description}\n`
-    text += `Topic: ${ex.topic} | Est. ${ex.time_estimate_minutes}min\n\n`
-  }
-  return text
-}
-
-function formatDashboard(dash: { overall_mastery: number; streak: { current_streak: number; longest_streak: number }; concepts_mastered: number; total_exercises: number; passed_exercises: number }): string {
-  return `### 📊 Your Progress\n\n` +
-    `**Overall Mastery:** ${Math.round(dash.overall_mastery)}%\n` +
-    `**Current Streak:** ${dash.streak.current_streak} days\n` +
-    `**Longest Streak:** ${dash.streak.longest_streak} days\n` +
-    `**Concepts Mastered:** ${dash.concepts_mastered}\n` +
-    `**Exercises:** ${dash.passed_exercises}/${dash.total_exercises} passed\n\n` +
-    `Keep up the great work! 🎉`
 }

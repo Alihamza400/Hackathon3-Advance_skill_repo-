@@ -8,6 +8,7 @@ from enum import Enum
 from datetime import datetime, timezone
 import os
 import uuid
+import httpx
 
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
@@ -290,60 +291,25 @@ class ConceptService:
     def get_explanation(self, concept: str, level: DifficultyLevel, context: str = None) -> Dict:
         concept_lower = concept.lower().strip()
         
-        # Check knowledge base
+        # Check knowledge base first
         if concept_lower in CONCEPT_KNOWLEDGE:
             level_data = CONCEPT_KNOWLEDGE[concept_lower].get(level.value, 
                             CONCEPT_KNOWLEDGE[concept_lower].get("beginner", {}))
-            
-            # Add context if provided
-            context_note = f"\n\nContext: {context}" if context else ""
-            
             return {
-                "concept": concept,
-                "level": level,
+                "concept": concept, "level": level,
                 "definition": level_data.get("definition", ""),
-                "explanation": level_data.get("explanation", "") + context_note,
+                "explanation": level_data.get("explanation", ""),
                 "key_points": level_data.get("key_points", []),
                 "analogies": level_data.get("analogies", []),
                 "code_examples": level_data.get("code_examples", []),
                 "common_mistakes": level_data.get("common_mistakes", []),
                 "related_concepts": level_data.get("related_concepts", []),
-                "practice_exercises": [
-                    {"title": f"Practice {concept}", "description": f"Write code using {concept}"},
-                    {"title": f"Debug {concept}", "description": f"Fix broken code using {concept}"}
-                ],
                 "prerequisites": level_data.get("prerequisites", []),
                 "next_steps": level_data.get("next_steps", []),
                 "estimated_reading_time_minutes": 10
             }
         
-        # Fallback for unknown concepts
-        return self._generate_generic_explanation(concept, level)
-    
-    def _generate_generic_explanation(self, concept: str, level: DifficultyLevel) -> Dict:
-        return {
-            "concept": concept,
-            "level": level,
-            "definition": f"{concept.capitalize()} is a programming concept in Python.",
-            "explanation": f"An explanation of {concept} at {level.value} level would go here.",
-            "key_points": [f"Key point about {concept}", "Another important aspect"],
-            "analogies": [f"{concept} is like a tool in your toolbox"],
-            "code_examples": [
-                {
-                    "title": f"Basic {concept}",
-                    "code": f"# Example of {concept}\nprint('Hello, {concept}!')",
-                    "explanation": f"Basic example of {concept}"
-                }
-            ],
-            "common_mistakes": [f"Common mistake with {concept}"],
-            "related_concepts": ["related_concept_1", "related_concept_2"],
-            "practice_exercises": [
-                {"title": f"Practice {concept}", "description": f"Write code using {concept}"}
-            ],
-            "prerequisites": ["basic_python"],
-            "next_steps": ["advanced_topics"],
-            "estimated_reading_time_minutes": 15
-        }
+        return {"concept": concept, "level": level, "use_llm": True}
 
 
 concept_service = ConceptService()
@@ -377,37 +343,56 @@ async def explain_concept(
     
     # Generate explanation
     explanation_data = concept_service.get_explanation(
-        request.concept, 
-        request.level,
-        request.context
+        request.concept, request.level, request.context
     )
     
-    # Add code examples if requested
-    code_examples = []
-    if request.include_examples:
-        code_examples = explanation_data.get("code_examples", [])
+    # If concept not in static KB, try LLM
+    if explanation_data.get("use_llm"):
+        llm_url = os.getenv("LLM_URL", "http://localhost:8010")
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                llm_resp = await client.post(f"{llm_url}/explain", json={
+                    "concept": request.concept, "level": request.level.value,
+                    "context": request.context,
+                })
+                if llm_resp.status_code == 200:
+                    llm_data = llm_resp.json()
+                    explanation_data = {
+                        "concept": llm_data.get("concept", request.concept),
+                        "level": request.level.value,
+                        "definition": llm_data.get("definition", ""),
+                        "explanation": llm_data.get("explanation", ""),
+                        "key_points": llm_data.get("key_points", []),
+                        "analogies": llm_data.get("analogies", []),
+                        "code_examples": [{"title": e["title"], "code": e["code"], "explanation": e["explanation"], "language": "python"} for e in llm_data.get("code_examples", [])],
+                        "common_mistakes": llm_data.get("common_mistakes", []),
+                        "related_concepts": llm_data.get("related_concepts", []),
+                        "practice_exercises": [],
+                        "prerequisites": [],
+                        "next_steps": llm_data.get("related_concepts", [])[:2],
+                        "estimated_reading_time_minutes": 10,
+                    }
+                    explanation_data["_source"] = "llm"
+                    logger.info(f"LLM generated explanation for: {request.concept}")
+        except Exception as e:
+            logger.warning(f"LLM call failed, using fallback: {e}")
     
+    source = explanation_data.get("_source", "static")
     explanation = ConceptExplanation(
-        concept=request.concept,
+        concept=explanation_data.get("concept", request.concept),
         level=request.level,
-        definition=explanation_data["definition"],
-        explanation=explanation_data["explanation"],
-        key_points=explanation_data["key_points"],
+        definition=explanation_data.get("definition", ""),
+        explanation=explanation_data.get("explanation", ""),
+        key_points=explanation_data.get("key_points", []),
         analogies=explanation_data.get("analogies", []),
-        code_examples=[
-            CodeExample(**ex) for ex in explanation_data.get("code_examples", [])
-        ],
+        code_examples=[CodeExample(**ex) for ex in explanation_data.get("code_examples", []) if ex.get("title")],
         common_mistakes=explanation_data.get("common_mistakes", []),
         related_concepts=explanation_data.get("related_concepts", []),
-        practice_exercises=explanation_data.get("practice_exercises", []),
-        prerequisites=explanation_data.get("prerequisites", []),
+        practice_exercises=[],
+        prerequisites=[],
         next_steps=explanation_data.get("next_steps", []),
         estimated_reading_time_minutes=explanation_data.get("estimated_reading_time_minutes", 10),
-        metadata={
-            "student_id": student_id,
-            "context": request.context,
-            "generated_at": datetime.now(timezone.utc).isoformat()
-        }
+        metadata={"student_id": student_id, "source": source, "generated_at": datetime.now(timezone.utc).isoformat()}
     )
     
     # Cache result
