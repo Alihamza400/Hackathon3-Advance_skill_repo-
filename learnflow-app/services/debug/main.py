@@ -1,7 +1,7 @@
 # Debug Agent Service - Helps students debug their code
 # LearnFlow AI Tutoring Platform
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Body
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -17,7 +17,7 @@ import json
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
     publish_event, get_current_user, get_optional_user,
-    dapr_client, publish_event
+    dapr_client, publish_event, HealthResponse
 )
 
 settings.service_name = "debug-agent"
@@ -228,8 +228,8 @@ class DebugEngine:
         ErrorType.ZERO_DIVISION_ERROR: [
             DebugHint(type="explanation", title="Division by Zero", content="You cannot divide by zero. Check denominator before division.", priority=1),
             DebugHint(type="suggestion", title="Guard Division", content="Use: if denominator != 0: result = numerator / denominator else: handle_error()", priority=2),
-            DebugHint(type="concept_link", title="Math Operations", content="Learn about division, modulo, floor division, and safe math operations.",            priority=3
-        ),
+            DebugHint(type="concept_link", title="Math Operations", content="Learn about division, modulo, floor division, and safe math operations.", priority=3)
+        ],
         ErrorType.IMPORT_ERROR: [
             DebugHint(type="explanation", title="Module Not Found", content="Python can't find the module you're trying to import.", priority=1),
             DebugHint(type="suggestion", title="Check Installation", content="Install with pip: pip install module_name. Check virtual environment is activated.", priority=2),

@@ -375,7 +375,7 @@ def create_app(service_name: str, title: str = None) -> FastAPI:
     # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["https://app.learnflow.com", "https://docs.learnflow.com"],
+        allow_origins=["https://app.learnflow.com", "https://docs.learnflow.com", "http://localhost:3000", "http://localhost:8000"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -530,7 +530,10 @@ async def publish_event(topic: str, event_type: str, payload: dict,
         "source": settings.service_name,
         "payload": payload,
     }
-    await dapr_client.publish_event("pubsub", topic, event)
+    try:
+        await dapr_client.publish_event("pubsub", topic, event)
+    except Exception as e:
+        logger.warning(f"Event publish failed (Dapr unavailable): {e}")
 
 
 # ============================================

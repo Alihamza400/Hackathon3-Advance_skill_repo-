@@ -5,13 +5,14 @@ from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
+from datetime import datetime, timezone
 import os
 import uuid
 
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
     publish_event, get_current_user, get_optional_user,
-    dapr_client, publish_event
+    dapr_client, publish_event, HealthResponse
 )
 
 settings.service_name = "concepts-agent"

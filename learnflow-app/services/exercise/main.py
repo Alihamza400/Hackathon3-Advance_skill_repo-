@@ -16,7 +16,7 @@ import textwrap
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
     publish_event, get_current_user, get_optional_user,
-    dapr_client
+    dapr_client, HealthResponse
 )
 
 settings.service_name = "exercise-agent"
@@ -359,45 +359,32 @@ class CodeExecutor:
     @staticmethod
     def run_test(student_code: str, test_case: TestCase) -> TestResult:
         """Run a single test case against student code"""
-        # Prepare test code
-        test_code = f"""
-{student_code}
-
-# Test execution
-import json
-import sys
-
-try:
-    # Prepare input
-    test_input = {json.dumps(test_case.input)}
-    
-    # Call the function if it's a function implementation
-    # This is simplified - real implementation would be more sophisticated
-    result = None
-    
-    # Capture output
-    import io
-    import contextlib
-    
-    output_buffer = io.StringIO()
-    with contextlib.redirect_stdout(output_buffer):
-        # Execute student code in a controlled way
-        exec_globals = {}
-        exec({json.dumps(student_code)}, exec_globals)
+        test_code = "\n".join([
+            student_code,
+            "",
+            "# Test execution",
+            "import json",
+            "import sys",
+            "",
+            "try:",
+            "    test_input = " + json.dumps(test_case.input),
+            "    result = None",
+            "    import io",
+            "    import contextlib",
+            "    output_buffer = io.StringIO()",
+            "    with contextlib.redirect_stdout(output_buffer):",
+            "        exec_globals = {}",
+            "        exec(" + json.dumps(student_code) + ", exec_globals)",
+            "    output = output_buffer.getvalue()",
+            "    expected = " + json.dumps(test_case.expected_output),
+            "    if output.strip() == str(expected).strip():",
+            "        print('PASS')",
+            "    else:",
+            "        print('FAIL: Expected ' + str(expected) + ', got ' + output.strip())",
+            "except Exception as e:",
+            "    print('ERROR: ' + str(e))",
+        ])
         
-    output = output_buffer.getvalue()
-    
-    # Compare with expected
-    expected = {json.dumps(test_case.expected_output)}
-    # Normalize output
-    if output.strip() == str(expected).strip():
-        print("PASS")
-    else:
-        print(f"FAIL: Expected {{expected}}, got {{output.strip()}}")
-        
-except Exception as e:
-    print(f"ERROR: {{e}}")
-"""
         
         # Write to temp file and execute
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
