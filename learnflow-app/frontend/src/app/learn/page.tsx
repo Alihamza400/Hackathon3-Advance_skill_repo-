@@ -32,15 +32,15 @@ export default function LearnPage() {
         <p className="text-muted-foreground">Chat with AI, explore concepts, and write code</p>
       </div>
 
-      <div className="flex gap-1 p-1 rounded-lg bg-secondary w-fit">
+      <div className="flex gap-1 p-1 rounded-xl bg-gradient-to-r from-secondary via-secondary to-primary/5 w-fit shadow-inner">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => handleTabChange(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
               activeTab === id
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-background text-foreground shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-white/5'
             }`}
           >
             <Icon className="h-4 w-4" />

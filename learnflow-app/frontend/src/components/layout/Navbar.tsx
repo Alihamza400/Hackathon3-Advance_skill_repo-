@@ -21,9 +21,11 @@ export function Navbar() {
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link href="/" className="flex items-center gap-2">
-            <GraduationCap className="h-7 w-7 text-primary" />
-            <span className="font-bold text-lg hidden sm:inline">LearnFlow</span>
+          <Link href="/" className="group flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 shadow-sm transition-transform duration-300 group-hover:scale-110">
+              <GraduationCap className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-bold text-lg hidden sm:inline bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">LearnFlow</span>
           </Link>
         </div>
 
