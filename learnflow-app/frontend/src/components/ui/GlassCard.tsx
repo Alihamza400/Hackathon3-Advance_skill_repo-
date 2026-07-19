@@ -27,6 +27,3 @@ export function GlassCard({ className, hover, glow, children, ...props }: GlassC
   )
 }
 
-export function GlassCardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-6', className)} {...props} />
-}

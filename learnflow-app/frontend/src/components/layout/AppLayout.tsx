@@ -8,7 +8,7 @@ import { useAuthStore } from '@/hooks/useAuth'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/utils'
 
-const authPages = ['/login', '/register', '/forgot-password']
+const authPages = ['/login', '/register']
 const publicPages = ['/', ...authPages]
 
 interface AppLayoutProps {

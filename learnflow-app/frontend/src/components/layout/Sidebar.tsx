@@ -9,7 +9,6 @@ import {
   Code,
   FileCode,
   Trophy,
-  Settings,
   LogOut,
   GraduationCap,
 } from 'lucide-react'
@@ -73,17 +72,6 @@ export function Sidebar({ collapsed, onClose }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t space-y-1">
-        <Link
-          href="/settings"
-          onClick={onClose}
-          className={cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-            'text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
-          )}
-        >
-          <Settings className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </Link>
         <button
           onClick={logout}
           className={cn(

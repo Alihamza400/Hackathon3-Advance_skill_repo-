@@ -124,7 +124,6 @@ export default function LoginPage() {
                   <label className="flex items-center gap-2 text-sm text-muted-foreground">
                     <input type="checkbox" className="rounded" /> Remember me
                   </label>
-                  <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">Forgot password?</a>
                 </div>
 
                 <button type="submit" disabled={loading}

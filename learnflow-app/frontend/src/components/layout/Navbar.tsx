@@ -38,15 +38,12 @@ export function Navbar() {
               <Link href="/learn">
                 <Button variant="ghost" size="sm">Learn</Button>
               </Link>
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent transition-colors"
-              >
+              <div className="flex items-center gap-2 px-2 py-1">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
                   {getInitials(user.full_name)}
                 </div>
                 <span className="text-sm font-medium hidden md:inline">{user.full_name}</span>
-              </Link>
+              </div>
               <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
             </>
           ) : (
