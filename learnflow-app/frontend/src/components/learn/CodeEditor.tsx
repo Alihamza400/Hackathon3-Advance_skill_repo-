@@ -128,7 +128,7 @@ export function CodeEditor({
           )}
           {result.execution_time_ms > 0 && (
             <p className="text-xs text-muted-foreground">
-              Completed in {result.execution_time_ms}ms (exit code: {result.exit_code})
+              Completed in {result.execution_time_ms}ms (exit code: {result.returncode})
             </p>
           )}
         </div>

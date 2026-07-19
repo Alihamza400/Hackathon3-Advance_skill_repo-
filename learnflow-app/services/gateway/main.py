@@ -41,6 +41,7 @@ SERVICES = {
     "exercise": os.getenv("EXERCISE_URL", "http://localhost:8006"),
     "progress": os.getenv("PROGRESS_URL", "http://localhost:8007"),
     "auth": os.getenv("AUTH_URL", "http://localhost:8001"),
+    "llm": os.getenv("LLM_URL", "http://localhost:8010"),
 }
 
 # Health checks
@@ -520,6 +521,21 @@ async def generate_exercises(
     return response.json()
 
 
+@app.post("/exercises/generate-ai")
+async def generate_exercises_ai(
+    request: Request,
+    generate_data: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate exercises via AI for any topic"""
+    response = await gateway_client.request(
+        "exercise", "POST", "/exercises/generate-ai",
+        json=generate_data,
+        headers={"Authorization": request.headers.get("Authorization", "")}
+    )
+    return response.json()
+
+
 @app.get("/exercises/{exercise_id}")
 async def get_exercise(
     exercise_id: str,
@@ -550,6 +566,55 @@ async def submit_exercise(
 
 
 # ============================================
+# LLM Agent Routes
+# ============================================
+
+@app.post("/llm/chat")
+async def llm_chat(
+    request: Request,
+    chat_data: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """Chat with LLM"""
+    response = await gateway_client.request(
+        "llm", "POST", "/chat",
+        json=chat_data,
+        headers={"Authorization": request.headers.get("Authorization", "")}
+    )
+    return response.json()
+
+
+@app.post("/llm/explain")
+async def llm_explain(
+    request: Request,
+    explain_data: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """Explain concept via LLM"""
+    response = await gateway_client.request(
+        "llm", "POST", "/explain",
+        json=explain_data,
+        headers={"Authorization": request.headers.get("Authorization", "")}
+    )
+    return response.json()
+
+
+@app.post("/llm/debug")
+async def llm_debug(
+    request: Request,
+    debug_data: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """Debug code via LLM"""
+    response = await gateway_client.request(
+        "llm", "POST", "/debug",
+        json=debug_data,
+        headers={"Authorization": request.headers.get("Authorization", "")}
+    )
+    return response.json()
+
+
+# ============================================
 # Progress Agent Routes
 # ============================================
 
@@ -570,6 +635,7 @@ async def record_progress_event(
 
 @app.get("/progress/dashboard")
 async def get_dashboard(
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Get student dashboard"""
@@ -582,6 +648,7 @@ async def get_dashboard(
 
 @app.get("/progress/streak")
 async def get_streak(
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Get streak info"""
@@ -595,6 +662,7 @@ async def get_streak(
 # Teacher endpoints
 @app.get("/teacher/dashboard")
 async def teacher_dashboard(
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Get teacher dashboard"""

@@ -39,7 +39,7 @@ export function ExerciseCard({ exercise, onStart }: ExerciseCardProps) {
           </Badge>
           <Badge variant="secondary">
             <Clock className="h-3 w-3 mr-1" />
-            {exercise.time_estimate_minutes} min
+            {exercise.estimated_minutes} min
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground capitalize">

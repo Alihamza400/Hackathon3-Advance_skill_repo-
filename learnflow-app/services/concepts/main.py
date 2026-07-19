@@ -341,41 +341,46 @@ async def explain_concept(
             related_topics=[]
         )
     
-    # Generate explanation
-    explanation_data = concept_service.get_explanation(
+    # Get static KB data as fallback
+    fallback_data = concept_service.get_explanation(
         request.concept, request.level, request.context
     )
     
-    # If concept not in static KB, try LLM
-    if explanation_data.get("use_llm"):
-        llm_url = os.getenv("LLM_URL", "http://localhost:8010")
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                llm_resp = await client.post(f"{llm_url}/explain", json={
-                    "concept": request.concept, "level": request.level.value,
-                    "context": request.context,
-                })
-                if llm_resp.status_code == 200:
-                    llm_data = llm_resp.json()
-                    explanation_data = {
-                        "concept": llm_data.get("concept", request.concept),
-                        "level": request.level.value,
-                        "definition": llm_data.get("definition", ""),
-                        "explanation": llm_data.get("explanation", ""),
-                        "key_points": llm_data.get("key_points", []),
-                        "analogies": llm_data.get("analogies", []),
-                        "code_examples": [{"title": e["title"], "code": e["code"], "explanation": e["explanation"], "language": "python"} for e in llm_data.get("code_examples", [])],
-                        "common_mistakes": llm_data.get("common_mistakes", []),
-                        "related_concepts": llm_data.get("related_concepts", []),
-                        "practice_exercises": [],
-                        "prerequisites": [],
-                        "next_steps": llm_data.get("related_concepts", [])[:2],
-                        "estimated_reading_time_minutes": 10,
-                    }
-                    explanation_data["_source"] = "llm"
-                    logger.info(f"LLM generated explanation for: {request.concept}")
-        except Exception as e:
-            logger.warning(f"LLM call failed, using fallback: {e}")
+    # ALWAYS try LLM first for every concept (dynamic AI explanations)
+    explanation_data = None
+    llm_url = os.getenv("LLM_URL", "http://localhost:8010")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            llm_resp = await client.post(f"{llm_url}/explain", json={
+                "concept": request.concept, "level": request.level.value,
+                "context": request.context,
+            })
+            if llm_resp.status_code == 200:
+                llm_data = llm_resp.json()
+                explanation_data = {
+                    "concept": llm_data.get("concept", request.concept),
+                    "level": request.level.value,
+                    "definition": llm_data.get("definition", ""),
+                    "explanation": llm_data.get("explanation", ""),
+                    "key_points": llm_data.get("key_points", []),
+                    "analogies": llm_data.get("analogies", []),
+                    "code_examples": [{"title": e["title"], "code": e["code"], "explanation": e["explanation"], "language": "python"} for e in llm_data.get("code_examples", [])],
+                    "common_mistakes": llm_data.get("common_mistakes", []),
+                    "related_concepts": llm_data.get("related_concepts", []),
+                    "practice_exercises": [],
+                    "prerequisites": [],
+                    "next_steps": llm_data.get("related_concepts", [])[:2],
+                    "estimated_reading_time_minutes": 10,
+                    "_source": "llm",
+                }
+                logger.info(f"LLM generated explanation for: {request.concept}")
+    except Exception as e:
+        logger.warning(f"LLM call failed, using static fallback: {e}")
+    
+    # Use LLM data if available, otherwise fall back to static KB
+    if not explanation_data:
+        explanation_data = fallback_data
+        explanation_data["_source"] = explanation_data.get("_source", "static")
     
     source = explanation_data.get("_source", "static")
     explanation = ConceptExplanation(

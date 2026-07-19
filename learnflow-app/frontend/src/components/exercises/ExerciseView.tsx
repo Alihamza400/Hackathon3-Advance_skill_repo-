@@ -120,9 +120,9 @@ export function ExerciseView({ exercise, onBack }: ExerciseViewProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">Score: {Math.round(result.score * 100)}%</p>
+            <p className="text-sm text-muted-foreground mb-3">Score: {Math.round(result.score)}%</p>
             <div className="space-y-2">
-              {result.results.map((test, i) => (
+              {result.test_results.map((test, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   {test.passed ? (
                     <CheckCircle className="h-4 w-4 text-success-500 mt-0.5 flex-shrink-0" />
@@ -130,11 +130,11 @@ export function ExerciseView({ exercise, onBack }: ExerciseViewProps) {
                     <XCircle className="h-4 w-4 text-error-500 mt-0.5 flex-shrink-0" />
                   )}
                   <div>
-                    <p className="font-medium">{test.description || `Test ${i + 1}`}</p>
+                    <p className="font-medium">{test.test_case?.description || `Test ${i + 1}`}</p>
                     {!test.passed && (
                       <div className="text-xs text-muted-foreground mt-1 space-y-1">
-                        <p>Expected: <code className="bg-secondary px-1 rounded">{test.expected}</code></p>
-                        <p>Actual: <code className="bg-secondary px-1 rounded">{test.actual}</code></p>
+                        <p>Expected: <code className="bg-secondary px-1 rounded">{String(test.test_case?.expected_output ?? '')}</code></p>
+                        <p>Actual: <code className="bg-secondary px-1 rounded">{test.actual_output}</code></p>
                         {test.error && <p className="text-error-500">{test.error}</p>}
                       </div>
                     )}

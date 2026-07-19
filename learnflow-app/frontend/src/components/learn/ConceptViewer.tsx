@@ -46,7 +46,7 @@ export function ConceptViewer({ initialConcept }: { initialConcept?: string }) {
       const res = await api.executeCode(runCode)
       setRunResult(res)
     } catch {
-      setRunResult({ stdout: '', stderr: 'Execution failed', exit_code: -1, execution_time_ms: 0, output: '' })
+      setRunResult({ stdout: '', stderr: 'Execution failed', success: false, returncode: -1, execution_time_ms: 0 })
     } finally {
       setRunning(false)
     }

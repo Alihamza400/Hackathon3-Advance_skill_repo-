@@ -220,13 +220,42 @@ class ApiClient {
 
   async submitExercise(submission: ExerciseSubmission): Promise<ExerciseResult> {
     const { data } = await this.client.post('/exercises/submit', submission)
-    return data
+    return {
+      ...data,
+      passed_tests: data.test_results?.filter((t: { passed: boolean }) => t.passed).length || 0,
+      total_tests: data.test_results?.length || 0,
+    }
   }
 
   // Progress
   async getDashboard(): Promise<DashboardData> {
     const { data } = await this.client.get('/progress/dashboard')
-    return data
+    return {
+      overall_mastery: data.overall_mastery_score ?? 0,
+      streak: {
+        current_streak: data.current_streak ?? 0,
+        longest_streak: data.longest_streak ?? 0,
+      },
+      concepts_mastered: data.topics_mastered ?? 0,
+      total_exercises: data.total_exercises ?? 0,
+      passed_exercises: data.passed_exercises ?? 0,
+      concept_mastery: (data.topics || []).map((t: Record<string, unknown>) => ({
+        concept: t.topic_id || '',
+        mastery_level: t.mastery_level || 'beginner',
+        score: t.mastery_score || 0,
+        exercises_attempted: 0,
+        exercises_passed: 0,
+      })),
+      recent_activity: (data.recent_activity || []).map((e: Record<string, unknown>) => ({
+        id: e.id || '',
+        event_type: e.type || e.event_type || 'unknown',
+        user_id: e.user_id || '',
+        concept: e.topic || e.concept,
+        metadata: e.metadata || {},
+        created_at: e.timestamp || e.created_at || new Date().toISOString(),
+      })),
+      suggested_topics: data.suggested_topics || data.topics?.filter((t: Record<string, unknown>) => t.status === 'learning' || t.status === 'not_started')?.map((t: Record<string, unknown>) => t.topic_id) || [],
+    }
   }
 
   async getStreak(): Promise<StreakInfo> {

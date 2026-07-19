@@ -267,14 +267,16 @@ class DebugEngine:
         dangerous = ["__import__", "exec", "eval", "compile", "open", "breakpoint", "__subclasses__"]
         restricted_imports = ["os", "sys", "subprocess", "shutil", "socket", "requests", "http", "ctypes", "signal", "multiprocessing", "threading"]
         wrapper = (
-            "import sys, builtins\n"
+            "import sys, builtins, types\n"
             "_safe_builtins = {k: v for k, v in builtins.__dict__.items() if k not in %s}\n"
             "_safe_builtins['__import__'] = lambda name, *args, **kw: "
             "    (_ for _ in ()).throw(ImportError('%%s is not allowed' %% name)) "
             "if name in %s else builtins.__import__(name, *args, **kw)\n"
-            "sys.modules.update({m: type(sys)('restricted') for m in %s})\n"
+            "_RestrictedModule = types.ModuleType('restricted')\n"
+            "_RestrictedModule._shutdown = lambda: None\n"
+            "sys.modules.update({m: _RestrictedModule for m in %s})\n"
             "builtins.__dict__.update(_safe_builtins)\n"
-            "del sys, builtins, _safe_builtins\n\n"
+            "del sys, builtins, _safe_builtins, types, _RestrictedModule\n\n"
         ) % (repr(dangerous), repr(restricted_imports), repr(restricted_imports))
         return wrapper + code
 
@@ -288,15 +290,19 @@ class DebugEngine:
 
         start_time = time.time()
         try:
-            input_data = test_input.encode() if test_input else None
+            safe_env = {
+                "PATH": os.environ.get("PATH", "/usr/bin"),
+                "HOME": os.environ.get("HOME", "/tmp"),
+                "LANG": "C.UTF-8",
+            }
             result = subprocess.run(
                 [sys.executable, '-I', temp_file],
-                input=input_data,
+                input=test_input if test_input is not None else "\n",
                 capture_output=True,
                 text=True,
                 timeout=10,
                 preexec_fn=self._apply_resource_limits,
-                env={},
+                env=safe_env,
             )
             exec_time = (time.time() - start_time) * 1000
 

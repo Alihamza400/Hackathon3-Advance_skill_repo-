@@ -87,11 +87,15 @@ export interface Exercise {
   type: ExerciseType
   difficulty: DifficultyLevel
   topic: string
+  subtopic?: string
   starter_code?: string
+  solution_code?: string
   test_cases: TestCase[]
   hints: string[]
-  solution?: string
-  time_estimate_minutes: number
+  estimated_minutes: number
+  points?: number
+  prerequisites?: string[]
+  tags?: string[]
 }
 
 export interface ExerciseSubmission {
@@ -102,22 +106,28 @@ export interface ExerciseSubmission {
 
 export interface TestResult {
   passed: boolean
-  description?: string
-  input?: string
-  expected: string
-  actual: string
+  test_case: {
+    input: Record<string, unknown>
+    expected_output: unknown
+    description?: string
+    hidden: boolean
+  }
+  actual_output: string
   error?: string
+  execution_time_ms?: number
 }
 
 export interface ExerciseResult {
+  exercise_id: string
   passed: boolean
   score: number
   total_tests: number
   passed_tests: number
-  results: TestResult[]
-  feedback: string
-  hints_used: number
-  time_spent_seconds: number
+  test_results: TestResult[]
+  feedback?: string
+  hints?: string[]
+  concepts_to_review?: string[]
+  execution_time_ms?: number
 }
 
 export type MasteryLevel = 'beginner' | 'learning' | 'proficient' | 'mastered'
@@ -201,11 +211,11 @@ export interface DebugResult {
 }
 
 export interface CodeExecutionResult {
+  success: boolean
   stdout: string
   stderr: string
-  exit_code: number
+  returncode: number
   execution_time_ms: number
-  output: string
 }
 
 export interface ChatMessage {

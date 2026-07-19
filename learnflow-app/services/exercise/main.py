@@ -12,6 +12,9 @@ import tempfile
 import os
 import sys
 import textwrap
+import time
+
+import httpx
 
 from shared.base import (
     create_app, settings, logger, cache_get, cache_set,
@@ -152,8 +155,8 @@ class ExerciseGenerator:
                 {
                     "title": "Create a Greeting Function",
                     "description": "Write a function called `greet` that takes a name parameter and returns a greeting string.",
-                    "starter_code": "def greet(name):\n    # Return greeting string\n    pass\n\n# Test your function\nprint(greet(\"Alice\"))",
-                    "solution_code": "def greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(\"Alice\"))",
+                    "starter_code": "def greet(name):\n    # Return greeting string\n    pass\n\nprint(greet(name))",
+                    "solution_code": "def greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(name))",
                     "test_cases": [
                         {"input": {"name": "Alice"}, "expected_output": "Hello, Alice!\n"},
                         {"input": {"name": "Bob"}, "expected_output": "Hello, Bob!\n"},
@@ -170,8 +173,8 @@ class ExerciseGenerator:
                 {
                     "title": "Calculate Factorial",
                     "description": "Write a recursive function to calculate the factorial of a number.",
-                    "starter_code": "def factorial(n):\n    # Implement recursive factorial\n    pass\n\n# Test\nprint(factorial(5))",
-                    "solution_code": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(5))",
+                    "starter_code": "def factorial(n):\n    # Implement recursive factorial\n    pass\n\nprint(factorial(n))",
+                    "solution_code": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(n))",
                     "test_cases": [
                         {"input": {"n": 5}, "expected_output": "120\n"},
                         {"input": {"n": 0}, "expected_output": "1\n"},
@@ -191,8 +194,8 @@ class ExerciseGenerator:
                 {
                     "title": "Print Numbers 1 to N",
                     "description": "Write a loop that prints numbers from 1 to n (inclusive).",
-                    "starter_code": "n = 5\n# Write a loop here\n",
-                    "solution_code": "n = 5\nfor i in range(1, n + 1):\n    print(i)",
+                    "starter_code": "# Write a loop that prints 1 to n\nfor i in range(1, n + 1):\n    print(i)",
+                    "solution_code": "for i in range(1, n + 1):\n    print(i)",
                     "test_cases": [
                         {"input": {"n": 5}, "expected_output": "1\n2\n3\n4\n5\n"},
                         {"input": {"n": 3}, "expected_output": "1\n2\n3\n"},
@@ -209,8 +212,8 @@ class ExerciseGenerator:
                 {
                     "title": "Sum of Even Numbers",
                     "description": "Calculate the sum of all even numbers from 1 to n.",
-                    "starter_code": "n = 10\n# Write code to sum even numbers from 1 to n\n",
-                    "solution_code": "n = 10\ntotal = 0\nfor i in range(2, n + 1, 2):\n    total += i\nprint(total)",
+                    "starter_code": "# Sum even numbers from 1 to n\ntotal = 0\nfor i in range(2, n + 1, 2):\n    total += i\nprint(total)",
+                    "solution_code": "total = 0\nfor i in range(2, n + 1, 2):\n    total += i\nprint(total)",
                     "test_cases": [
                         {"input": {"n": 10}, "expected_output": "30\n"},
                         {"input": {"n": 5}, "expected_output": "6\n"},
@@ -229,8 +232,8 @@ class ExerciseGenerator:
                 {
                     "title": "Even or Odd Checker",
                     "description": "Write a program that checks if a number is even or odd.",
-                    "starter_code": "number = 7\n# Write if/else to check even or odd\n",
-                    "solution_code": "number = 7\nif number % 2 == 0:\n    print(\"Even\")\nelse:\n    print(\"Odd\")",
+                    "starter_code": "# Check if number is even or odd\nif number % 2 == 0:\n    print(\"Even\")\nelse:\n    print(\"Odd\")",
+                    "solution_code": "if number % 2 == 0:\n    print(\"Even\")\nelse:\n    print(\"Odd\")",
                     "test_cases": [
                         {"input": {"number": 7}, "expected_output": "Odd\n"},
                         {"input": {"number": 4}, "expected_output": "Even\n"},
@@ -246,8 +249,8 @@ class ExerciseGenerator:
                 {
                     "title": "Find Maximum in List",
                     "description": "Write a function to find the maximum value in a list without using max().",
-                    "starter_code": "def find_max(numbers):\n    # Find and return maximum\n    pass\n\nprint(find_max([3, 1, 4, 1, 5, 9, 2]))",
-                    "solution_code": "def find_max(numbers):\n    if not numbers:\n        return None\n    max_val = numbers[0]\n    for num in numbers:\n        if num > max_val:\n            max_val = num\n    return max_val\n\nprint(find_max([3, 1, 4, 1, 5, 9, 2]))",
+                    "starter_code": "def find_max(numbers):\n    # Find and return maximum\n    pass\n\nprint(find_max(numbers))",
+                    "solution_code": "def find_max(numbers):\n    if not numbers:\n        return None\n    max_val = numbers[0]\n    for num in numbers:\n        if num > max_val:\n            max_val = num\n    return max_val\n\nprint(find_max(numbers))",
                     "test_cases": [
                         {"input": {"numbers": [3, 1, 4, 1, 5, 9, 2]}, "expected_output": "9\n"},
                         {"input": {"numbers": [10, 5, 8]}, "expected_output": "10\n"},
@@ -358,31 +361,22 @@ class CodeExecutor:
     
     @staticmethod
     def run_test(student_code: str, test_case: TestCase) -> TestResult:
-        """Run a single test case against student code"""
+        """Run a single test case against student code with injected test inputs"""
         test_code = "\n".join([
-            student_code,
+            "import sys, io, contextlib, json",
             "",
-            "# Test execution",
-            "import json",
-            "import sys",
-            "",
-            "try:",
-            "    test_input = " + json.dumps(test_case.input),
-            "    result = None",
-            "    import io",
-            "    import contextlib",
-            "    output_buffer = io.StringIO()",
-            "    with contextlib.redirect_stdout(output_buffer):",
-            "        exec_globals = {}",
-            "        exec(" + json.dumps(student_code) + ", exec_globals)",
-            "    output = output_buffer.getvalue()",
-            "    expected = " + json.dumps(test_case.expected_output),
-            "    if output.strip() == str(expected).strip():",
-            "        print('PASS')",
-            "    else:",
-            "        print('FAIL: Expected ' + str(expected) + ', got ' + output.strip())",
-            "except Exception as e:",
-            "    print('ERROR: ' + str(e))",
+            "# Injected test variables + student code in shared namespace",
+            "test_input = " + json.dumps(test_case.input),
+            "exec_globals = {**{k: v for k, v in test_input.items()}, '__builtins__': __builtins__}",
+            "output_buffer = io.StringIO()",
+            "with contextlib.redirect_stdout(output_buffer):",
+            "    exec(" + json.dumps(student_code) + ", exec_globals)",
+            "output = output_buffer.getvalue()",
+            "expected = " + json.dumps(test_case.expected_output),
+            "if output.strip() == str(expected).strip():",
+            "    print('PASS')",
+            "else:",
+            "    print('FAIL: Expected ' + repr(expected) + ', got ' + repr(output))",
         ])
         
         
@@ -593,6 +587,74 @@ async def list_exercises(
         "total": 0,
         "message": "Use /exercises/generate to create exercises"
     }
+
+
+@app.post("/exercises/generate-ai")
+async def generate_exercises_ai(
+    request: ExerciseRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate coding exercises via LLM for ANY topic"""
+    llm_url = os.getenv("LLM_URL", "http://localhost:8010")
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            llm_resp = await client.post(f"{llm_url}/chat", json={
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": f"You are an expert exercise designer. Generate {request.count} Python exercise(s) for topic '{request.topic}' at '{request.difficulty.value}' level. Return a JSON object with key 'exercises' containing an array of exercises. Each exercise has: id (uuid), title, description, difficulty, type (function_implementation), topic, starter_code (with TODO/pass), solution_code, test_cases (array with input dict, expected_output, description, hidden), hints (2-3 strings), estimated_minutes (int), points (int). The test input keys must match variable names in starter_code."},
+                    {"role": "user", "content": f"Create {request.count} {request.difficulty.value} Python exercise(s) about {request.topic}."},
+                ],
+                "temperature": 0.7,
+                "max_tokens": 3000,
+                "response_format": {"type": "json_object"},
+            })
+            if llm_resp.status_code == 200:
+                llm_data = llm_resp.json()
+                content = llm_data.get("content", "{}")
+                content = content.strip()
+                if content.startswith("```"):
+                    content = content.split("\n", 1)[-1] if "\n" in content else content[3:]
+                if content.endswith("```"):
+                    content = content.rsplit("```", 1)[0]
+                content = content.strip()
+                try:
+                    exercises_data = json.loads(content)
+                except json.JSONDecodeError:
+                    raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
+                
+                exercises = []
+                for ex_data in exercises_data.get("exercises", []):
+                    exercise = Exercise(
+                        id=ex_data.get("id", str(uuid.uuid4())),
+                        title=ex_data.get("title", f"Practice {request.topic}"),
+                        description=ex_data.get("description", ""),
+                        difficulty=DifficultyLevel(ex_data.get("difficulty", request.difficulty.value)),
+                        type=ExerciseType(ex_data.get("type", "function_implementation")),
+                        topic=request.topic,
+                        subtopic=request.subtopic,
+                        starter_code=ex_data.get("starter_code", ""),
+                        solution_code=ex_data.get("solution_code", ""),
+                        test_cases=[TestCase(**tc) for tc in ex_data.get("test_cases", [])],
+                        hints=ex_data.get("hints", []),
+                        estimated_minutes=ex_data.get("estimated_minutes", 15),
+                        points=ex_data.get("points", 20),
+                        tags=[request.topic, request.difficulty.value],
+                    )
+                    exercises.append(exercise)
+                    await cache_set(f"exercise:{exercise.id}", exercise.model_dump(), 86400)
+                
+                background_tasks.add_task(
+                    publish_event, "exercises.generated", "exercises_generated",
+                    {"student_id": current_user.get("sub"), "topic": request.topic, "count": len(exercises)}
+                )
+                return GeneratedExercise(exercises=exercises)
+            
+            raise HTTPException(status_code=502, detail=f"LLM service returned {llm_resp.status_code}")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="LLM service timed out")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"LLM service unavailable: {e}")
 
 
 @app.get("/health", response_model=HealthResponse)

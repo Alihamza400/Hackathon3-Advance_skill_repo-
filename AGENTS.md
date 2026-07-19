@@ -87,6 +87,17 @@ claude "create AGENTS.md for this repository using agents-md-gen skill"
 
 ## Resources
 
+## Available Skills
+
+### `concept-reasoner` (`.opencode/skills/concept-reasoner/`)
+Deep LLM-powered concept explanations with Socratic reasoning, analogies, code examples, and follow-up Q&A. Uses the LLM service's `/explain` and `/chat` endpoints.
+
+### `ai-exercise-engineer` (`.opencode/skills/ai-exercise-engineer/`)
+Generates dynamic programming exercises via LLM for ANY topic and difficulty. Produces starter code, test cases, hints, and solutions — no hardcoded templates.
+
+### `concept-speaker` (`.opencode/skills/concept-speaker/`)
+Speech-optimized concept explanations formatted for text-to-speech engines.
+
 ## Frequently Asked Questions
 
 **Q: What's the difference between traditional development and agentic development?**

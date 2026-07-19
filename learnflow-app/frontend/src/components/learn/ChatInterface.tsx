@@ -38,12 +38,46 @@ export function ChatInterface() {
 
     try {
       const token = localStorage.getItem('access_token')
-      const resp = await fetch('/api/concepts/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ concept: query.replace(/^(explain|what is|how does|tell me about)\s+/i, '').trim(), level: 'beginner' }),
-      })
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
 
+      // Try concepts/explain first for concept queries
+      const concept = query.replace(/^(explain|what is|how does|tell me about|what are)\s+/i, '').trim()
+      const isDebug = /debug|error|bug|fix|broken/i.test(query)
+      const isExercise = /exercise|practice|challenge/i.test(query)
+
+      if (isDebug) {
+        const resp = await fetch('/api/debug', {
+          method: 'POST', headers,
+          body: JSON.stringify({ code: concept, include_traceback: true }),
+        })
+        if (resp.ok) {
+          const d = await resp.json()
+          const content = `## 🔍 Debug Analysis\n\n**Error Type:** ${d.error_type}\n\n**${d.error_explanation}**\n\n**Root Cause:** ${d.root_cause}\n\n${d.hints?.map((h: { title: string; content: string }) => `### ${h.title}\n${h.content}`).join('\n\n') || ''}${d.fixed_code ? `\n\n### Suggested Fix\n\`\`\`python\n${d.fixed_code}\n\`\`\`` : ''}\n\n---\n*🤖 AI-powered debugging*`
+          setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content, timestamp: new Date().toISOString() }])
+          return
+        }
+      }
+
+      if (isExercise) {
+        const resp = await fetch('/api/llm/chat', {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: 'You are an expert tutor. Generate a Python exercise for the topic requested. Include: title, description, starter code (with # TODO), hints, and example solution. Format in Markdown.' },
+              { role: 'user', content: concept || query },
+            ],
+            max_tokens: 1500,
+          }),
+        })
+        if (resp.ok) {
+          const d = await resp.json()
+          setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `## ✏️ Exercise\n\n${d.content}`, timestamp: new Date().toISOString() }])
+          return
+        }
+      }
+
+      // Try concepts/explain
+      const resp = await fetch('/api/concepts/explain', { method: 'POST', headers, body: JSON.stringify({ concept, level: 'beginner' }) })
       if (resp.ok) {
         const data = await resp.json()
         const e = data.explanation
@@ -57,11 +91,23 @@ export function ChatInterface() {
         content += `\n---\n*${e.metadata?.source === 'llm' ? '🤖 AI-generated' : '📖 From knowledge base'}*`
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content, timestamp: new Date().toISOString() }])
       } else {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(), role: 'assistant',
-          content: 'I couldn\'t find that concept. Try being more specific, or ask me about variables, functions, classes, decorators, recursion, etc.',
-          timestamp: new Date().toISOString(),
-        }])
+        // Fallback to LLM chat for general queries
+        const fallback = await fetch('/api/llm/chat', {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: 'You are a helpful Python tutor. Answer concisely with examples where helpful.' },
+              { role: 'user', content: query },
+            ],
+            max_tokens: 1000,
+          }),
+        })
+        if (fallback.ok) {
+          const d = await fallback.json()
+          setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: d.content, timestamp: new Date().toISOString() }])
+        } else {
+          setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: 'I had trouble answering that. Try asking about a specific Python concept like "variables", "functions", or "classes".', timestamp: new Date().toISOString() }])
+        }
       }
     } catch (e) {
       setMessages(prev => [...prev, {
