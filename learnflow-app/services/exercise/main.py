@@ -142,7 +142,7 @@ class ExerciseGenerator:
                     "starter_code": "a = 10\nb = 20\n# Swap a and b here\n\nprint(f\"a = {a}, b = {b}\")",
                     "solution_code": "a = 10\nb = 20\na, b = b, a\nprint(f\"a = {a}, b = {b}\")",
                     "test_cases": [
-                        {"input": {}, "expected_output": "a = 20, b = 10\n"},
+                        {"input": {}, "expected_output": "a = 20, b = 10\n", "description": "Swap a=10 and b=20"},
                     ],
                     "hints": ["Python supports tuple unpacking for swapping"],
                     "estimated_minutes": 10,
@@ -158,8 +158,8 @@ class ExerciseGenerator:
                     "starter_code": "def greet(name):\n    # Return greeting string\n    pass\n\nprint(greet(name))",
                     "solution_code": "def greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(name))",
                     "test_cases": [
-                        {"input": {"name": "Alice"}, "expected_output": "Hello, Alice!\n"},
-                        {"input": {"name": "Bob"}, "expected_output": "Hello, Bob!\n"},
+                        {"input": {"name": "Alice"}, "expected_output": "Hello, Alice!\n", "description": "Greet Alice"},
+                        {"input": {"name": "Bob"}, "expected_output": "Hello, Bob!\n", "description": "Greet Bob"},
                     ],
                     "hints": [
                         "Use f-strings for string formatting",
@@ -176,9 +176,9 @@ class ExerciseGenerator:
                     "starter_code": "def factorial(n):\n    # Implement recursive factorial\n    pass\n\nprint(factorial(n))",
                     "solution_code": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(n))",
                     "test_cases": [
-                        {"input": {"n": 5}, "expected_output": "120\n"},
-                        {"input": {"n": 0}, "expected_output": "1\n"},
-                        {"input": {"n": 1}, "expected_output": "1\n"},
+                        {"input": {"n": 5}, "expected_output": "120\n", "description": "Factorial of 5"},
+                        {"input": {"n": 0}, "expected_output": "1\n", "description": "Factorial of 0"},
+                        {"input": {"n": 1}, "expected_output": "1\n", "description": "Factorial of 1"},
                     ],
                     "hints": [
                         "Base case: factorial(0) = 1 and factorial(1) = 1",
@@ -197,8 +197,8 @@ class ExerciseGenerator:
                     "starter_code": "# Write a loop that prints 1 to n\nfor i in range(1, n + 1):\n    print(i)",
                     "solution_code": "for i in range(1, n + 1):\n    print(i)",
                     "test_cases": [
-                        {"input": {"n": 5}, "expected_output": "1\n2\n3\n4\n5\n"},
-                        {"input": {"n": 3}, "expected_output": "1\n2\n3\n"},
+                        {"input": {"n": 5}, "expected_output": "1\n2\n3\n4\n5\n", "description": "Print 1 to 5"},
+                        {"input": {"n": 3}, "expected_output": "1\n2\n3\n", "description": "Print 1 to 3"},
                     ],
                     "hints": [
                         "Use range(start, end+1) for inclusive range",
@@ -215,8 +215,8 @@ class ExerciseGenerator:
                     "starter_code": "# Sum even numbers from 1 to n\ntotal = 0\nfor i in range(2, n + 1, 2):\n    total += i\nprint(total)",
                     "solution_code": "total = 0\nfor i in range(2, n + 1, 2):\n    total += i\nprint(total)",
                     "test_cases": [
-                        {"input": {"n": 10}, "expected_output": "30\n"},
-                        {"input": {"n": 5}, "expected_output": "6\n"},
+                        {"input": {"n": 10}, "expected_output": "30\n", "description": "Sum evens up to 10"},
+                        {"input": {"n": 5}, "expected_output": "6\n", "description": "Sum evens up to 5"},
                     ],
                     "hints": [
                         "Use range(start, end, step) with step=2",
@@ -235,8 +235,8 @@ class ExerciseGenerator:
                     "starter_code": "# Check if number is even or odd\nif number % 2 == 0:\n    print(\"Even\")\nelse:\n    print(\"Odd\")",
                     "solution_code": "if number % 2 == 0:\n    print(\"Even\")\nelse:\n    print(\"Odd\")",
                     "test_cases": [
-                        {"input": {"number": 7}, "expected_output": "Odd\n"},
-                        {"input": {"number": 4}, "expected_output": "Even\n"},
+                        {"input": {"number": 7}, "expected_output": "Odd\n", "description": "7 is odd"},
+                        {"input": {"number": 4}, "expected_output": "Even\n", "description": "4 is even"},
                     ],
                     "hints": ["Use modulo operator %", "Even numbers have remainder 0 when divided by 2"],
                     "estimated_minutes": 8,
@@ -252,8 +252,8 @@ class ExerciseGenerator:
                     "starter_code": "def find_max(numbers):\n    # Find and return maximum\n    pass\n\nprint(find_max(numbers))",
                     "solution_code": "def find_max(numbers):\n    if not numbers:\n        return None\n    max_val = numbers[0]\n    for num in numbers:\n        if num > max_val:\n            max_val = num\n    return max_val\n\nprint(find_max(numbers))",
                     "test_cases": [
-                        {"input": {"numbers": [3, 1, 4, 1, 5, 9, 2]}, "expected_output": "9\n"},
-                        {"input": {"numbers": [10, 5, 8]}, "expected_output": "10\n"},
+                        {"input": {"numbers": [3, 1, 4, 1, 5, 9, 2]}, "expected_output": "9\n", "description": "Max of [3,1,4,1,5,9,2]"},
+                        {"input": {"numbers": [10, 5, 8]}, "expected_output": "10\n", "description": "Max of [10,5,8]"},
                     ],
                     "hints": ["Initialize max with first element", "Compare each element with current max"],
                     "estimated_minutes": 15,
@@ -263,12 +263,19 @@ class ExerciseGenerator:
         }
     }
     
+    TOPIC_ALIASES = {
+        "variables": "variable", "functions": "function", "loops": "loop",
+        "conditionals": "conditional", "lists": "list", "strings": "string",
+        "classes": "class", "dictionaries": "dict", "tuples": "tuple",
+    }
+
     def generate_exercises(self, request: ExerciseRequest) -> List[Exercise]:
         """Generate exercises based on request"""
         exercises = []
         
-        # Get templates for topic
-        topic_templates = self.EXERCISE_TEMPLATES.get(request.topic, {})
+        # Get templates for topic (handle singular/plural aliases)
+        topic_key = self.TOPIC_ALIASES.get(request.topic, request.topic)
+        topic_templates = self.EXERCISE_TEMPLATES.get(topic_key, {})
         difficulty_templates = topic_templates.get(request.difficulty.value, [])
         
         # If no specific templates, use generic ones
@@ -297,13 +304,31 @@ class ExerciseGenerator:
     
     def _get_generic_templates(self, topic: str, difficulty: DifficultyLevel) -> List[Dict]:
         """Generate generic templates when specific ones not available"""
+        var_name = "x"
+        desc_extra = "Use the provided variable and print your result."
+        starter = f"# Use the variable `{var_name}` and solve the problem\nresult = {var_name} * 2\nprint(result)"
+        solution = f"result = {var_name} * 2\nprint(result)"
+        test_cases = [{"input": {var_name: 5}, "expected_output": "10\n", "description": f"Double the value of {var_name}", "hidden": False}]
+        
+        if difficulty == DifficultyLevel.INTERMEDIATE:
+            test_cases = [
+                {"input": {var_name: 5}, "expected_output": "10\n", "description": f"Double {var_name}=5", "hidden": False},
+                {"input": {var_name: 12}, "expected_output": "24\n", "description": f"Double {var_name}=12", "hidden": False},
+            ]
+        elif difficulty == DifficultyLevel.ADVANCED:
+            test_cases = [
+                {"input": {var_name: 5}, "expected_output": "10\n", "description": f"Double {var_name}=5", "hidden": False},
+                {"input": {var_name: -3}, "expected_output": "-6\n", "description": f"Double {var_name}=-3", "hidden": False},
+                {"input": {var_name: 0}, "expected_output": "0\n", "description": f"Double {var_name}=0", "hidden": False},
+            ]
+        
         return [{
             "title": f"Practice {topic.capitalize()}",
-            "description": f"Practice exercise for {topic} at {difficulty.value} level",
-            "starter_code": f"# Practice {topic} here\npass",
-            "solution_code": f"# Solution for {topic}\npass",
-            "test_cases": [{"input": {}, "expected_output": ""}],
-            "hints": [f"Review {topic} concepts"],
+            "description": f"Practice exercise for {topic} at {difficulty.value} level. {desc_extra}",
+            "starter_code": starter,
+            "solution_code": solution,
+            "test_cases": test_cases,
+            "hints": [f"Review {topic} concepts", f"The variable `{var_name}` is already defined for you"],
             "estimated_minutes": 15,
             "points": 20
         }]
@@ -668,5 +693,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", "8000"))
+    port = int(os.environ.get("PORT", "8006"))
     uvicorn.run(app, host="0.0.0.0", port=port)

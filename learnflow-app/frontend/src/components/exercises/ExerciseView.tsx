@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { CodeEditor } from '@/components/learn/CodeEditor'
 import { api } from '@/lib/api'
-import { Lightbulb, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Lightbulb, CheckCircle, XCircle, Target, Code } from 'lucide-react'
 import type { Exercise, ExerciseResult, TestResult } from '@/types'
 
 interface ExerciseViewProps {
@@ -46,9 +46,7 @@ export function ExerciseView({ exercise, onBack }: ExerciseViewProps) {
     setShowHints(true)
   }
 
-  function getResultVariant(resultItem: TestResult) {
-    return resultItem.passed ? 'success' as const : 'error' as const
-  }
+  const visibleTests = exercise.test_cases.filter(t => !t.hidden)
 
   return (
     <div className="space-y-4">
@@ -68,11 +66,58 @@ export function ExerciseView({ exercise, onBack }: ExerciseViewProps) {
         </CardHeader>
       </Card>
 
-      <CodeEditor
-        initialCode={code}
-        onChange={setCode}
-        height="350px"
-      />
+      {visibleTests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-emerald-500" />
+              <CardTitle className="text-base">Problem: Expected Behavior</CardTitle>
+            </div>
+            <CardDescription>
+              Your code will be tested against these cases. Make sure it produces the correct output for each.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {visibleTests.map((test, i) => (
+                <div key={i} className="rounded-lg border bg-card p-3 text-sm">
+                  <p className="font-medium mb-1">{test.description || `Test ${i + 1}`}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div>
+                      <span className="font-medium text-foreground">Input:</span>{' '}
+                      <code className="bg-secondary px-1 rounded">
+                        {Object.keys(test.input).length > 0
+                          ? Object.entries(test.input).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(', ')
+                          : '(none)'}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Expected:</span>{' '}
+                      <code className="bg-secondary px-1 rounded">{String(test.expected_output ?? '')}</code>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Code className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-base">Your Solution</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <CodeEditor
+            initialCode={code}
+            onChange={setCode}
+            height="350px"
+          />
+        </CardContent>
+      </Card>
 
       <div className="flex items-center gap-2">
         <Button onClick={handleSubmit} loading={submitting}>
